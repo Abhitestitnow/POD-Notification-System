@@ -143,7 +143,7 @@
         <header class="mb-6 pb-4 border-b-2 border-primary flex flex-col justify-between items-start transition duration-300">
             <!-- Fixed Header -->
             <h1 class="text-3xl font-extrabold text-primary p-1 w-full">
-                POD Release notification system
+                POD Release Notification System
             </h1>
             
             <div class="mt-4 w-full flex justify-between items-center text-sm text-gray-600 no-clutter no-print">
@@ -360,6 +360,7 @@
         setLogLevel('Debug');
 
         // --- Global Configuration (Using environment variables) ---
+        // These variables are injected by the Canvas environment, ensuring secure access to your project.
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id'; 
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
@@ -384,16 +385,20 @@
         let WEEK_TYPE_OPTIONS = [NEXT_WEEK_KEY, PREV_WEEK_KEY, BLOCKER_KEY]; // Default options for the form
         let CUSTOM_WEEKS = []; 
         
+        // --- Firestore Collection Paths (Public data) ---
+        // Path: /artifacts/{appId}/public/data/releases
         const COLLECTION_RELEASES = 'releases'; 
+        // Path: /artifacts/{appId}/public/data/settings
         const COLLECTION_SETTINGS = 'settings'; 
         const SETTINGS_DOC_ID = 'app_config';
+        
         const THEMES = [
-            { id: 'default', name: 'Indigo', class: '', primary: '#4f46e5' }, // Default
-            { id: 'dark', name: 'Dark Mode', class: 'theme-dark', primary: '#1f2937' }, // Dark Background
-            { id: 'teal', name: 'Teal Accent', class: 'theme-teal', primary: '#14b8a6' }, // Light with Teal
-            { id: 'blue', name: 'Ocean Blue', class: 'theme-blue', primary: '#3b82f6' }, // Light with Blue
-            { id: 'pink', name: 'Rose', class: 'theme-pink', primary: '#ec4899' }, // Light with Pink
-            { id: 'emerald', name: 'Forest Green', class: 'theme-emerald', primary: '#059669' }, // Light with Green
+            { id: 'default', name: 'Indigo', class: '', primary: '#4f46e5' }, 
+            { id: 'dark', name: 'Dark Mode', class: 'theme-dark', primary: '#1f2937' }, 
+            { id: 'teal', name: 'Teal Accent', class: 'theme-teal', primary: '#14b8a6' }, 
+            { id: 'blue', name: 'Ocean Blue', class: 'theme-blue', primary: '#3b82f6' }, 
+            { id: 'pink', name: 'Rose', class: 'theme-pink', primary: '#ec4899' }, 
+            { id: 'emerald', name: 'Forest Green', class: 'theme-emerald', primary: '#059669' }, 
         ];
 
 
@@ -429,7 +434,7 @@
         const customWeeksInput = document.getElementById('custom-weeks-input'); 
 
 
-        // --- Utility Functions ---
+        // --- Custom Component for Select Inputs ---
 
         class LabelSelect extends HTMLElement {
             constructor() {
@@ -449,6 +454,8 @@
             }
         }
         customElements.define('label-select', LabelSelect);
+
+        // --- Utility Functions ---
 
         const getPriorityColor = (priority) => {
             switch (priority) {
@@ -499,7 +506,6 @@
         
         /**
          * Calculates the week ID immediately preceding the given week ID (Wxx_YYYY).
-         * Assumes 52 weeks per year for simplicity.
          */
         const getPreviousWeekId = (currentWeekId) => {
             if (!currentWeekId || !currentWeekId.startsWith('W')) return null;
@@ -564,7 +570,7 @@
             return [...new Set(defaultWeeks)]; // Ensure uniqueness
         }
         
-        // --- THEME LOGIC (Continued) ---
+        // --- THEME LOGIC ---
         
         // Expose to window for inline HTML access
         window.changeTheme = async (themeId) => {
@@ -635,12 +641,11 @@
 
         closeThemeModalBtn.addEventListener('click', window.closeThemeModal);
         
-        // --- PRESENTATION MODE LOGIC (Continued) ---
+        // --- PRESENTATION MODE LOGIC ---
         
         window.togglePresentationMode = () => {
             body.classList.toggle('presentation-mode');
             
-            // Get the button and the icon inside it
             const toggleButton = document.getElementById('presentation-toggle-btn');
             const icon = toggleButton ? toggleButton.querySelector('i') : null;
             
@@ -667,12 +672,6 @@
                 if (!itemModal.classList.contains('hidden')) window.closeModal();
                 if (!themeModal.classList.contains('hidden')) window.closeThemeModal();
                 if (!settingsModal.classList.contains('hidden')) window.closeSettingsModal();
-                
-                // Also hide the custom confirmation dialog
-                const confirmModal = document.getElementById('confirmation-modal');
-                if (confirmModal && !confirmModal.classList.contains('hidden')) {
-                    // To be implemented in showCustomConfirmation logic
-                }
             }
         });
         
@@ -710,14 +709,15 @@
         };
 
         // --- FIREBASE REFERENCES ---
-        // Public settings reference
+        // Public settings reference: /artifacts/{appId}/public/data/settings/app_config
         const settingsRef = () => doc(db, 'artifacts', appId, 'public', 'data', COLLECTION_SETTINGS, SETTINGS_DOC_ID);
-        // Public releases collection reference
+        // Public releases collection reference: /artifacts/{appId}/public/data/releases
         const releasesCollection = () => collection(db, 'artifacts', appId, 'public', 'data', COLLECTION_RELEASES);
         const releaseDocRef = (id) => doc(db, 'artifacts', appId, 'public', 'data', COLLECTION_RELEASES, id);
 
 
         // --- SETTINGS MANAGEMENT (Admin Configuration) ---
+        
         const loadSettings = async () => {
             if (!isAuthReady || !db) return;
 
@@ -765,6 +765,7 @@
             }
         };
 
+        // Function to save admin settings (Pods, Week Types, Custom Weeks)
         window.saveSettings = async (event) => {
             event.preventDefault();
             
@@ -781,6 +782,7 @@
             const newCustomWeeks = customWeeksInput.value.split('\n').map(s => s.trim()).filter(s => s.length > 0 && s.match(/^W\d{2}_\d{4}$/));
 
             try {
+                // Use setDoc to update the single settings document
                 await setDoc(settingsRef(), {
                     pods: newPods,
                     weekTypes: newWeekTypes,
@@ -798,6 +800,7 @@
         };
 
         // --- DATA MANAGEMENT (Releases) ---
+        
         const listenForReleases = () => {
             if (!isAuthReady || !db) return;
 
@@ -813,6 +816,7 @@
             });
         };
 
+        // Function to save/update a release item (CRUD Create/Update)
         window.saveReleaseItem = async (event) => {
             event.preventDefault();
             if (!isAuthReady || !db) return;
@@ -835,11 +839,11 @@
 
             try {
                 if (itemId) {
-                    // Update existing item
+                    // Update existing item using updateDoc
                     await updateDoc(releaseDocRef(itemId), data);
                     console.log("Item updated:", itemId);
                 } else {
-                    // Add new item
+                    // Add new item using addDoc
                     await addDoc(releasesCollection(), { 
                         ...data,
                         createdBy: userId,
@@ -853,10 +857,11 @@
             }
         };
 
+        // Function to delete a release item (CRUD Delete)
         window.deleteReleaseItem = async (itemId) => {
              if (!isAuthReady || !db) return;
 
-             // Use the custom confirmation modal
+             // Use the custom confirmation modal (replaces alert/confirm)
              const confirmDelete = await showCustomConfirmation(
                 "Confirm Delete",
                 "Are you sure you want to permanently delete this release item? This action cannot be undone."
