@@ -1,0 +1,1252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POD Release notification system</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        /* Base (Default/Indigo) Theme */
+        :root {
+            --primary-color: #4f46e5; /* Indigo-600 */
+            --primary-bg: #4f46e5;
+            --secondary-bg: #f9fafb; /* Gray-50 */
+            --text-color: #1f2937; /* Gray-900 */
+        }
+        
+        /* Dark Theme */
+        .theme-dark {
+            --primary-color: #10b981; /* Emerald-500 as accent */
+            --primary-bg: #1f2937; /* Gray-800 */
+            --secondary-bg: #374151; /* Gray-700 */
+            --text-color: #f3f4f6; /* Gray-100 */
+        }
+        
+        /* Teal Accent Theme */
+        .theme-teal {
+            --primary-color: #14b8a6; /* Teal-500 */
+            --primary-bg: #14b8a6;
+            --secondary-bg: #f0fdfa; /* Teal-50 */
+            --text-color: #115e59; /* Teal-900; */
+        }
+
+        /* Ocean Blue Theme */
+        .theme-blue {
+            --primary-color: #3b82f6; /* Blue-500 */
+            --primary-bg: #3b82f6;
+            --secondary-bg: #eff6ff; /* Blue-50 */
+            --text-color: #1e3a8a; /* Blue-900 */
+        }
+
+        /* Rose Theme */
+        .theme-pink {
+            --primary-color: #ec4899; /* Pink-500 */
+            --primary-bg: #ec4899;
+            --secondary-bg: #fdf2f8; /* Pink-50 */
+            --text-color: #831843; /* Pink-900 */
+        }
+
+        /* Forest Green Theme */
+        .theme-emerald {
+            --primary-color: #059669; /* Emerald-600 */
+            --primary-bg: #059669;
+            --secondary-bg: #f0fdfa; /* Emerald-50 */
+            --text-color: #064e3b; /* Emerald-900 */
+        }
+
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background-color: var(--secondary-bg);
+            color: var(--text-color);
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        /* Apply theme colors using variables */
+        .header-bg { background-color: var(--primary-bg); }
+        .header-text { color: var(--text-color); }
+        .main-button { background-color: var(--primary-color); }
+        /* Adjusted hover for better contrast calculation */
+        .main-button:hover { background-color: color-mix(in srgb, var(--primary-color) 85%, black); } 
+        .border-primary { border-color: color-mix(in srgb, var(--primary-color) 20%, white); }
+        .text-primary { color: var(--primary-color); }
+        .focus-primary { 
+            border-color: var(--primary-color); 
+            box-shadow: 0 0 0 1px var(--primary-color);
+        }
+        
+        /* Card background in non-dark themes */
+        .bg-white { 
+            background-color: var(--secondary-bg); /* Use secondary background for card/white areas */
+        }
+        .theme-dark .bg-white {
+            background-color: #1f2937; /* Dark mode card bg */
+        }
+        
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        }
+        
+        #week-selector-container::-webkit-scrollbar { height: 6px; }
+        #week-selector-container::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        #week-selector-container::-webkit-scrollbar-track { background: #f1f5f9; }
+
+        /* Presentation Mode Hiding */
+        body.presentation-mode .no-clutter,
+        body.presentation-mode .edit-icon,
+        body.presentation-mode .controls,
+        body.presentation-mode .footer-controls,
+        /* NEW: Hide PDF button in presentation mode */
+        body.presentation-mode #pdf-download-btn { 
+            display: none !important;
+        }
+        /* Ensure the main grid takes full width in presentation mode */
+        body.presentation-mode #dashboard-grid {
+             grid-template-columns: 1fr !important;
+        }
+
+        /* Styling for Print (PDF) Output */
+        @media print {
+            body { background-color: white !important; color: black !important; }
+            .no-print { display: none !important; }
+            .main-content-grid {
+                grid-template-columns: 2fr 1fr; 
+            }
+            header, footer, .controls { border: none !important; }
+            #pdf-download-btn { display: none !important; } /* Hide for actual printing */
+        }
+    </style>
+    <!-- Lucide icons for professional look (e.g., edit, trash) -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="bg-gray-50">
+
+    <div id="app" class="min-h-screen p-4 sm:p-6 relative">
+        <!-- Presentation Mode Toggle (Top Right) -->
+        <button 
+            id="presentation-toggle-btn" 
+            class="no-clutter absolute top-6 right-6 z-40 p-2 text-primary bg-white rounded-full shadow-lg hover:shadow-xl transition duration-300" 
+            title="Toggle Presentation Mode (Press Esc to exit)"
+            onclick="togglePresentationMode()"
+        >
+            <i data-lucide="monitor" class="w-6 h-6"></i>
+        </button>
+
+        <!-- Header & Customization (Now fixed) -->
+        <header class="mb-6 pb-4 border-b-2 border-primary flex flex-col justify-between items-start transition duration-300">
+            <!-- Fixed Header -->
+            <h1 class="text-3xl font-extrabold text-primary p-1 w-full">
+                POD Release notification system
+            </h1>
+            
+            <div class="mt-4 w-full flex justify-between items-center text-sm text-gray-600 no-clutter no-print">
+                <div class="flex items-center space-x-2">
+                    <span class="font-medium text-gray-700">Filter by Pod:</span>
+                    <!-- Pod Filter List -->
+                    <div id="pod-filter-list" class="flex flex-wrap space-x-3">
+                        <!-- Pod buttons generated here -->
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Timeline / Week Selector -->
+        <div class="controls mb-6 p-4 bg-white rounded-xl shadow-lg no-clutter no-print">
+            <h3 class="text-base font-semibold text-gray-700 mb-3">Release Timeline (Current Week: <span id="current-week-display" class="font-bold text-primary"></span>)</h3>
+            <div id="week-selector-container" class="flex overflow-x-auto space-x-2 pb-2">
+                <!-- Week buttons generated here -->
+            </div>
+        </div>
+        
+        <!-- Controls & New Item Button (Kept for general "Add New Item") -->
+        <div class="controls flex justify-end items-center mb-6 p-4 bg-white rounded-xl shadow-lg no-clutter no-print">
+            <!-- New Item Button -->
+            <button 
+                id="new-item-btn"
+                class="px-4 py-2 main-button text-white font-semibold rounded-lg shadow-lg transition duration-300 whitespace-nowrap w-full sm:w-auto"
+                onclick="window.openModal(true, 'Next Week')"
+            >
+                + Add General Release Item
+            </button>
+        </div>
+        
+        <!-- Loading Indicator -->
+        <div id="loading-indicator" class="text-center p-8 hidden">
+            <svg class="animate-spin h-8 w-8 text-primary mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p class="mt-2 text-gray-600">Connecting to database...</p>
+        </div>
+
+
+        <!-- Dashboard Grid (2-Column Layout) -->
+        <div id="dashboard-grid" class="grid grid-cols-1 lg:grid-cols-3 gap-6 auto-rows-fr main-content-grid">
+            
+            <!-- Left Column (Stack Previous and Next Releases) -->
+            <div class="lg:col-span-2 space-y-6">
+                <div id="previous-releases">
+                    <!-- Previous Week Card will be injected here -->
+                </div>
+                <div id="next-releases">
+                    <!-- Next Week Card will be injected here -->
+                </div>
+            </div>
+
+            <!-- Right Column (Blockers) -->
+            <div id="blockers-section" class="lg:col-span-1">
+                <!-- Blockers Card will be injected here -->
+            </div>
+
+        </div>
+
+        <!-- Footer -->
+        <footer class="mt-8 text-sm text-gray-500 pt-4 border-t border-gray-300 flex justify-between items-center">
+            <!-- Control Buttons (Bottom Left) -->
+            <div class="footer-controls flex items-center space-x-4">
+                <!-- Theme Option Button -->
+                <button 
+                    id="theme-toggle-btn" 
+                    class="p-2 text-gray-500 bg-white rounded-full shadow-md hover:bg-gray-100 transition duration-300" 
+                    title="Change Theme"
+                    onclick="window.openThemeModal()"
+                >
+                    <i data-lucide="palette" class="w-5 h-5"></i>
+                </button>
+                
+                <!-- Admin Settings Button -->
+                <button 
+                    id="admin-settings-btn" 
+                    class="p-2 text-gray-500 bg-white rounded-full shadow-md hover:bg-gray-100 transition duration-300" 
+                    title="Admin Settings (Pods, Categories)"
+                    onclick="window.openSettingsModal()"
+                >
+                    <i data-lucide="settings" class="w-5 h-5"></i>
+                </button>
+                <span>Data Source: Firebase Firestore | User: <span id="user-id-display">...</span></span>
+            </div>
+
+            <!-- PDF Download Button (Bottom Right) -->
+            <button id="pdf-download-btn" class="px-3 py-1 bg-gray-200 text-gray-700 font-medium rounded-lg shadow-sm hover:bg-gray-300 transition duration-300 no-print">
+                Download as PDF
+            </button>
+        </footer>
+    </div>
+
+    <!-- Modal for adding/editing item -->
+    <div id="item-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-75 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+        <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 transition-transform duration-300 transform scale-95 opacity-0" id="modal-content">
+            <div class="flex justify-between items-center p-5 border-b bg-primary rounded-t-xl header-bg">
+                <h3 id="modal-title" class="text-2xl font-semibold text-white">Add New Release Item</h3>
+                <button id="close-modal-btn" class="text-white hover:text-gray-200 text-3xl font-light">&times;</button>
+            </div>
+            <form id="item-form" class="p-6 space-y-4">
+                <input type="hidden" id="item-id-input" name="id" value="" />
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label for="key-input" class="block text-sm font-medium text-gray-700">Ticket Key (e.g., PAY-123)</label>
+                        <input type="text" id="key-input" name="key" required
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary p-2 border focus-primary"
+                        />
+                    </div>
+                    <div>
+                        <label for="owner-input" class="block text-sm font-medium text-gray-700">Owner</label>
+                        <input type="text" id="owner-input" name="owner" required
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary p-2 border focus-primary"
+                        />
+                    </div>
+                </div>
+
+                <div>
+                    <label for="summary-input" class="block text-sm font-medium text-gray-700">Summary / Description</label>
+                    <textarea id="summary-input" name="summary" rows="2" required
+                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary p-2 border focus-primary"
+                    ></textarea>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                    <label-select id="pod-select-form" label="Pod" name="pod"></label-select>
+                    <label-select id="priority-select-form" label="Priority" name="priority"></label-select>
+                    <label-select id="category-select-form" label="Category" name="week_type"></label-select>
+                    <label-select id="status-select-form" label="Status" name="status"></label-select>
+                </div>
+                
+                <div>
+                    <label for="week-input" class="block text-sm font-medium text-gray-700">Target Week (e.g., W52_2025)</label>
+                    <input type="text" id="week-input" name="week_id" required
+                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary p-2 border focus-primary"
+                        title="Format: W[WeekNumber]_[Year], e.g., W52_2025"
+                    />
+                </div>
+
+
+                <div class="pt-4 flex justify-end space-x-3">
+                    <button type="button" id="form-cancel-btn" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition duration-150 shadow-md">
+                        Cancel
+                    </button>
+                    <button type="submit" id="form-submit-btn" class="px-4 py-2 text-sm font-medium text-white main-button rounded-lg transition duration-150 shadow-md">
+                        Save Item
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Modal for Theme Selection -->
+    <div id="theme-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-75 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+        <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-sm mx-4 p-6 transition-transform duration-300 transform scale-95 opacity-0" id="theme-modal-content">
+            <h3 class="text-xl font-semibold text-gray-900 mb-4 border-b pb-2">Select Theme</h3>
+            <div id="theme-options" class="grid grid-cols-3 gap-4">
+                <!-- Theme buttons will be rendered here -->
+            </div>
+            <button id="close-theme-modal-btn" class="absolute top-3 right-4 text-gray-500 hover:text-gray-800 text-2xl font-light">&times;</button>
+        </div>
+    </div>
+
+    <!-- Admin Settings Modal -->
+    <div id="settings-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-75 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+        <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-xl mx-4 transition-transform duration-300 transform scale-95 opacity-0" id="settings-modal-content">
+            <div class="flex justify-between items-center p-5 border-b bg-primary rounded-t-xl header-bg">
+                <h3 class="text-2xl font-semibold text-white">Admin Settings</h3>
+                <button id="close-settings-modal-btn" class="text-white hover:text-gray-200 text-3xl font-light">&times;</button>
+            </div>
+            <form id="settings-form" class="p-6 space-y-6">
+                <!-- Pods Editor -->
+                <div>
+                    <label for="pods-input" class="block text-sm font-bold text-gray-700 mb-2">Editable Pod List (One item per line):</label>
+                    <textarea id="pods-input" rows="6" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary p-3 border focus-primary" placeholder="Enter one pod name per line."></textarea>
+                    <p class="text-xs text-gray-500 mt-1">Example: Demand and supply, SLA, Loss reduction...</p>
+                </div>
+                
+                <!-- Week Types Editor -->
+                <div>
+                    <label for="week-types-input" class="block text-sm font-bold text-gray-700 mb-2">Editable Category Options (One item per line):</label>
+                    <textarea id="week-types-input" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary p-3 border focus-primary" placeholder="Enter one category per line."></textarea>
+                    <p class="text-xs text-gray-500 mt-1">These populate the 'Category' dropdown when adding items. Existing items using 'Next Week', 'Previous Week', or 'Blocker' will still appear in the dashboard sections.</p>
+                </div>
+                
+                <!-- Custom Weeks Editor -->
+                <div>
+                    <label for="custom-weeks-input" class="block text-sm font-bold text-gray-700 mb-2">Editable Timeline Weeks (W##_YYYY format, one per line):</label>
+                    <textarea id="custom-weeks-input" rows="6" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary p-3 border focus-primary" placeholder="Example: W52_2025, W01_2026, W02_2026"></textarea>
+                    <p class="text-xs text-gray-500 mt-1">These weeks are displayed in the timeline selector at the top.</p>
+                </div>
+
+                <div class="pt-4 flex justify-end">
+                    <button type="submit" class="px-4 py-2 text-sm font-medium text-white main-button rounded-lg transition duration-150 shadow-md">
+                        Save Settings
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+    <script type="module">
+        // --- Firebase SDK Imports ---
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, onSnapshot, addDoc, doc, setDoc, updateDoc, deleteDoc, writeBatch, getDocs, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // IMPORTANT: Enable debug logging for Firestore
+        setLogLevel('Debug');
+
+        // --- Global Configuration (Using environment variables) ---
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id'; 
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        let db;
+        let auth;
+        let userId = 'anonymous'; 
+        let dashboardData = []; 
+        let currentFilter = 'All'; 
+        let currentWeekId = ''; 
+        let currentTheme = 'default';
+        let isAuthReady = false;
+
+        // --- Application Constants (Now loaded from Firestore) ---
+        let PODS = ['Demand and supply', 'SLA', 'Loss reduction', 'Customer Experience', 'High yield client'];
+        const PRIORITY_OPTIONS = ['Critical', 'High', 'Medium', 'Low'];
+        const STATUS_OPTIONS = ['Planned', 'In Progress', 'Released', 'Blocked'];
+        // Fixed keys for UI sections - MUST NOT be changed even if custom options are changed
+        const NEXT_WEEK_KEY = 'Next Week'; 
+        const PREV_WEEK_KEY = 'Previous Week'; 
+        const BLOCKER_KEY = 'Blocker'; 
+        let WEEK_TYPE_OPTIONS = [NEXT_WEEK_KEY, PREV_WEEK_KEY, BLOCKER_KEY]; // Default options for the form
+        let CUSTOM_WEEKS = []; 
+        
+        const COLLECTION_RELEASES = 'releases'; 
+        const COLLECTION_SETTINGS = 'settings'; 
+        const SETTINGS_DOC_ID = 'app_config';
+        const THEMES = [
+            { id: 'default', name: 'Indigo', class: '', primary: '#4f46e5' }, // Default
+            { id: 'dark', name: 'Dark Mode', class: 'theme-dark', primary: '#1f2937' }, // Dark Background
+            { id: 'teal', name: 'Teal Accent', class: 'theme-teal', primary: '#14b8a6' }, // Light with Teal
+            { id: 'blue', name: 'Ocean Blue', class: 'theme-blue', primary: '#3b82f6' }, // Light with Blue
+            { id: 'pink', name: 'Rose', class: 'theme-pink', primary: '#ec4899' }, // Light with Pink
+            { id: 'emerald', name: 'Forest Green', class: 'theme-emerald', primary: '#059669' }, // Light with Green
+        ];
+
+
+        // --- DOM Elements ---
+        const body = document.body;
+        const userIdDisplay = document.getElementById('user-id-display');
+        const podFilterList = document.getElementById('pod-filter-list');
+        const weekSelectorContainer = document.getElementById('week-selector-container');
+        const currentWeekDisplay = document.getElementById('current-week-display');
+        const newItemBtn = document.getElementById('new-item-btn');
+        const itemModal = document.getElementById('item-modal');
+        const modalContent = document.getElementById('modal-content');
+        const closeModalBtn = document.getElementById('close-modal-btn');
+        const formCancelBtn = document.getElementById('form-cancel-btn');
+        const itemForm = document.getElementById('item-form');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const previousReleasesDiv = document.getElementById('previous-releases');
+        const nextReleasesDiv = document.getElementById('next-releases');
+        const blockersSectionDiv = document.getElementById('blockers-section');
+        const themeModal = document.getElementById('theme-modal');
+        const themeModalContent = document.getElementById('theme-modal-content');
+        const closeThemeModalBtn = document.getElementById('close-theme-modal-btn');
+        const themeOptionsDiv = document.getElementById('theme-options');
+        const pdfDownloadBtn = document.getElementById('pdf-download-btn');
+        
+        // Admin Settings Elements
+        const settingsModal = document.getElementById('settings-modal');
+        const settingsModalContent = document.getElementById('settings-modal-content');
+        const closeSettingsModalBtn = document.getElementById('close-settings-modal-btn');
+        const settingsForm = document.getElementById('settings-form');
+        const podsInput = document.getElementById('pods-input');
+        const weekTypesInput = document.getElementById('week-types-input');
+        const customWeeksInput = document.getElementById('custom-weeks-input'); 
+
+
+        // --- Utility Functions ---
+
+        class LabelSelect extends HTMLElement {
+            constructor() {
+                super();
+                this.innerHTML = `
+                    <div>
+                        <label for="${this.id}" class="block text-sm font-medium text-gray-700">${this.getAttribute('label')}</label>
+                        <select id="${this.id}" name="${this.getAttribute('name')}" 
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary p-2 border focus-primary"
+                        ></select>
+                    </div>
+                `;
+            }
+        }
+        customElements.define('label-select', LabelSelect);
+
+        const getPriorityColor = (priority) => {
+            switch (priority) {
+                case 'Critical': return 'bg-red-600';
+                case 'High': return 'bg-orange-500';
+                case 'Medium': return 'bg-yellow-500';
+                case 'Low': return 'bg-green-500';
+                default: return 'bg-gray-400';
+            }
+        };
+
+        const createPriorityBadge = (priority) => `
+            <span class="inline-flex items-center px-3 py-0.5 rounded-full text-xs font-medium text-white ${getPriorityColor(priority)}">
+                ${priority}
+            </span>
+        `;
+        
+        const populateSelect = (id, options) => {
+            const selectElement = document.getElementById(id)?.querySelector('select');
+            if (!selectElement) return;
+            selectElement.innerHTML = '';
+            options.forEach(optionText => {
+                const option = document.createElement('option');
+                option.value = optionText;
+                option.textContent = optionText;
+                selectElement.appendChild(option);
+            });
+            // Select the first option if none is selected
+            if (options.length > 0 && selectElement.value === "") {
+                selectElement.value = options[0];
+            }
+        };
+
+        const weekToLabel = (weekId) => {
+            if (!weekId || !weekId.startsWith('W')) return 'N/A';
+            const [w, y] = weekId.slice(1).split('_');
+            const weekNumber = parseInt(w, 10);
+            const year = y.slice(2);
+            
+            let monthLabel = '';
+            if (weekNumber >= 40) monthLabel = 'Q4';
+            else if (weekNumber >= 26) monthLabel = 'Q3';
+            else if (weekNumber >= 13) monthLabel = 'Q2';
+            else monthLabel = 'Q1';
+
+            return `W${w} (${monthLabel}'${year})`;
+        };
+        
+        /**
+         * Calculates the week ID immediately preceding the given week ID (Wxx_YYYY).
+         * Handles year rollover (W01_YYYY -> W52_YYYY-1).
+         * Assumes 52 weeks per year for simplicity.
+         */
+        const getPreviousWeekId = (currentWeekId) => {
+            if (!currentWeekId || !currentWeekId.startsWith('W')) return null;
+
+            const [wStr, yStr] = currentWeekId.slice(1).split('_');
+            let week = parseInt(wStr, 10);
+            let year = parseInt(yStr, 10);
+
+            if (week === 1) {
+                week = 52;
+                year -= 1;
+            } else {
+                week -= 1;
+            }
+            
+            // Re-format to W##_YYYY
+            return `W${String(week).padStart(2, '0')}_${year}`;
+        };
+
+
+        const getCurrentWeekId = () => {
+            // Calculate a plausible current week ID (e.g., W52_2026) for consistent demo purposes
+            const now = new Date();
+            const year = now.getFullYear();
+            // Simple approximation: Week number is (Day of Year / 7)
+            const onejan = new Date(year, 0, 1);
+            const weekNum = Math.ceil((((now - onejan) / 86400000) + onejan.getDay() + 1) / 7);
+            const formattedWeekNum = String(weekNum).padStart(2, '0');
+            return `W${formattedWeekNum}_${year}`;
+        };
+
+        const getCustomWeeksDefault = () => {
+            const current = getCurrentWeekId();
+            const [w, y] = current.slice(1).split('_').map(Number);
+            const defaultWeeks = [];
+            
+            // Generate previous 2 weeks and next 3 weeks
+            for (let i = -2; i <= 3; i++) {
+                let targetWeek = w + i;
+                let targetYear = y;
+
+                // Simple wrap-around logic (not perfectly ISO week calendar accurate, but functional)
+                if (targetWeek <= 0) {
+                    targetWeek += 52;
+                    targetYear -= 1;
+                } else if (targetWeek > 52) {
+                    targetWeek -= 52;
+                    targetYear += 1;
+                }
+
+                if (targetYear >= y - 1) { // Limit to past year
+                    defaultWeeks.push(`W${String(targetWeek).padStart(2, '0')}_${targetYear}`);
+                }
+            }
+            return [...new Set(defaultWeeks)]; // Ensure uniqueness
+        }
+        
+        // --- THEME LOGIC ---
+        
+        // Expose to window for inline HTML access
+        window.changeTheme = async (themeId) => {
+            const theme = THEMES.find(t => t.id === themeId);
+            if (!theme) return;
+
+            // 1. Update global state
+            currentTheme = theme.id;
+            
+            // 2. Apply CSS class to body
+            body.className = body.className.split(' ').filter(c => !c.startsWith('theme-') && c !== 'bg-gray-50').join(' ');
+            if (theme.class) {
+                body.classList.add(theme.class);
+            } else {
+                body.classList.add('bg-gray-50'); 
+            }
+            
+            // 3. Persist to Firestore
+            try {
+                if (db) {
+                    await updateDoc(settingsRef(), { theme: themeId, updatedBy: userId, updatedTimestamp: new Date().toISOString() });
+                }
+            } catch (error) {
+                console.error('Error persisting theme:', error);
+            }
+            
+            renderPodFilters(); 
+            lucide.createIcons();
+        };
+
+        window.openThemeModal = () => { // Expose to window for inline HTML access
+            renderThemeOptions();
+            themeModal.classList.remove('hidden');
+            setTimeout(() => {
+                themeModalContent.classList.remove('scale-95', 'opacity-0');
+                themeModalContent.classList.add('scale-100', 'opacity-100');
+            }, 10);
+        };
+
+        window.closeThemeModal = () => { // Expose to window for inline HTML access
+            themeModalContent.classList.remove('scale-100', 'opacity-100');
+            themeModalContent.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                themeModal.classList.add('hidden');
+            }, 300);
+        };
+
+        const renderThemeOptions = () => {
+            themeOptionsDiv.innerHTML = THEMES.map(theme => {
+                const isActive = theme.id === currentTheme;
+                // Use a dynamic contrast color for the text inside the button preview
+                const textColor = theme.id === 'dark' || theme.id === 'default' ? 'text-white' : 'text-gray-800'; 
+                
+                return `
+                    <button 
+                        class="theme-option p-3 rounded-lg shadow-md border-2 transition duration-200 flex flex-col items-center hover:shadow-lg ${isActive ? 'border-primary ring-2 ring-primary' : 'border-gray-200'}"
+                        style="background-color: ${theme.primary};"
+                        onclick="window.changeTheme('${theme.id}'); window.closeThemeModal();"
+                    >
+                        <i data-lucide="droplet" class="w-6 h-6 ${textColor} mb-1"></i>
+                        <span class="text-xs font-semibold ${textColor}">${theme.name.split(' ')[0]}</span>
+                    </button>
+                `;
+            }).join('');
+            lucide.createIcons();
+        };
+
+        closeThemeModalBtn.addEventListener('click', window.closeThemeModal);
+        
+        // --- PRESENTATION MODE LOGIC ---
+        window.togglePresentationMode = () => {
+            body.classList.toggle('presentation-mode');
+            
+            // Get the button and the icon inside it
+            const toggleButton = document.getElementById('presentation-toggle-btn');
+            const icon = toggleButton ? toggleButton.querySelector('i') : null;
+            
+            if (icon) {
+                if (body.classList.contains('presentation-mode')) {
+                    icon.setAttribute('data-lucide', 'monitor-off');
+                } else {
+                    icon.setAttribute('data-lucide', 'monitor');
+                }
+                lucide.createIcons();
+            } else {
+                console.warn('Presentation toggle icon not found after toggling mode.');
+            }
+            
+            renderPodFilters(); 
+        };
+
+        // Event listener for the Escape key 
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                if (body.classList.contains('presentation-mode')) {
+                    window.togglePresentationMode();
+                } 
+            }
+        });
+
+
+        // --- FIREBASE SETUP & DATA HANDLING ---
+
+        const authenticateAndInit = async () => {
+            loadingIndicator.classList.remove('hidden');
+
+            try {
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+                userId = auth.currentUser?.uid || crypto.randomUUID();
+                userIdDisplay.textContent = userId; // Display the userId
+                isAuthReady = true;
+
+                currentWeekId = getCurrentWeekId();
+                currentWeekDisplay.textContent = weekToLabel(currentWeekId);
+
+                // 1. Fetch Settings (Theme, PODS, WEEK_TYPE_OPTIONS, CUSTOM_WEEKS)
+                await setupSettingsListener();
+
+                // 2. Setup mock data if empty
+                await checkAndPopulateMockData();
+
+                // 3. Set up real-time listener for release items
+                setupRealtimeListener();
+
+            } catch (error) {
+                console.error("Firebase initialization or authentication failed:", error);
+                loadingIndicator.textContent = `Error loading dashboard: ${error.message}. Check console.`;
+            }
+        };
+        
+        const settingsRef = () => doc(db, `/artifacts/${appId}/public/data/${COLLECTION_SETTINGS}/${SETTINGS_DOC_ID}`);
+
+        const setupSettingsListener = () => {
+            return new Promise((resolve) => {
+                onSnapshot(settingsRef(), (docSnapshot) => {
+                    let shouldRerender = false;
+                    
+                    if (docSnapshot.exists()) {
+                        const data = docSnapshot.data();
+                        
+                        // Theme update
+                        const newTheme = data.theme || 'default';
+                        if (newTheme !== currentTheme) {
+                            currentTheme = newTheme;
+                            setTimeout(() => window.changeTheme(currentTheme), 0); 
+                        }
+
+                        // Pods update
+                        const newPods = data.pods || PODS;
+                        if (JSON.stringify(newPods) !== JSON.stringify(PODS)) {
+                            PODS = newPods;
+                            shouldRerender = true;
+                        }
+
+                        // Week Types update (Options for the form's Category dropdown)
+                        const newWeekTypes = data.weekTypes || WEEK_TYPE_OPTIONS;
+                        if (JSON.stringify(newWeekTypes) !== JSON.stringify(WEEK_TYPE_OPTIONS)) {
+                            WEEK_TYPE_OPTIONS = newWeekTypes;
+                            // Rerender form selects, not dashboard, as this list doesn't affect data grouping
+                        }
+                        
+                        // Custom Weeks update
+                        const newCustomWeeks = data.customWeeks || getCustomWeeksDefault();
+                        if (JSON.stringify(newCustomWeeks) !== JSON.stringify(CUSTOM_WEEKS)) {
+                            CUSTOM_WEEKS = newCustomWeeks;
+                            shouldRerender = true;
+                        }
+
+                    } else {
+                        // If doc doesn't exist, create it with defaults
+                        setDoc(settingsRef(), { 
+                            theme: currentTheme, 
+                            pods: PODS, 
+                            weekTypes: WEEK_TYPE_OPTIONS, 
+                            customWeeks: getCustomWeeksDefault(), 
+                            createdBy: userId 
+                        });
+                        shouldRerender = true; 
+                    }
+                    
+                    if (shouldRerender && isAuthReady) {
+                        renderPodFilters(); 
+                        renderDashboard();
+                    }
+                    resolve();
+                }, (error) => {
+                    console.error("Error setting up settings listener:", error);
+                    resolve();
+                });
+            });
+        };
+
+
+        const checkAndPopulateMockData = async () => {
+             const releasesRef = collection(db, `/artifacts/${appId}/public/data/${COLLECTION_RELEASES}`);
+             const snapshot = await getDocs(releasesRef);
+
+            if (snapshot.empty) {
+                const batch = writeBatch(db);
+                
+                const currentId = getCurrentWeekId(); 
+                const previousId = getPreviousWeekId(currentId);
+                
+                // Use the fixed keys for mock data creation
+                const mockData = [
+                    // NEXT WEEK (Current Week - Planned)
+                    { pod: 'Demand and supply', key: 'DS-201', summary: 'New automated forecast model integration', priority: 'High', status: 'Planned', week_type: NEXT_WEEK_KEY, owner: 'Raja', week_id: currentId, date: new Date().toISOString().split('T')[0] },
+                    { pod: 'SLA', key: 'SLA-05', summary: 'Service level objective review and re-calibration', priority: 'Medium', status: 'Planned', week_type: NEXT_WEEK_KEY, owner: 'Priya', week_id: currentId, date: new Date().toISOString().split('T')[0] },
+                    
+                    // PREVIOUS WEEK (Last Week - Released)
+                    { pod: 'Loss reduction', key: 'LR-10', summary: 'Rollout of fraud detection module v2.0', priority: 'Critical', status: 'Released', week_type: PREV_WEEK_KEY, owner: 'Ganesh', week_id: previousId, date: new Date().toISOString().split('T')[0] },
+                    { pod: 'Customer Experience', key: 'CX-44', summary: 'Mobile app dark mode feature launch', priority: 'Medium', status: 'Released', week_type: PREV_WEEK_KEY, owner: 'Sneha', week_id: previousId, date: new Date().toISOString().split('T')[0] },
+                    
+                    // ITEM THAT SHOULD BE ROLLED OVER (Last Week - Planned, but not released)
+                    { pod: 'High yield client', key: 'HY-ROLL', summary: 'High-value contract signing pre-work', priority: 'High', status: 'Planned', week_type: NEXT_WEEK_KEY, owner: 'Vikram', week_id: previousId, date: new Date().toISOString().split('T')[0] },
+
+                    // BLOCKERS (Current Week)
+                    { pod: 'Demand and supply', key: 'DS-BLOCK', summary: 'Critical data source migration postponed', priority: 'Critical', status: 'Blocked', week_type: BLOCKER_KEY, owner: 'Raja', week_id: currentId, date: new Date().toISOString().split('T')[0] },
+                ];
+
+                mockData.forEach((item) => {
+                    const docRef = doc(releasesRef); 
+                    batch.set(docRef, item);
+                });
+
+                await batch.commit();
+                console.log("Mock data populated successfully.");
+            }
+        };
+        
+        /**
+         * Migrates unreleased items from the previous week's 'Next Week' category
+         * to the current week's 'Previous Week' category.
+         */
+        const migrateReleases = async () => {
+            if (!db || !currentWeekId) return;
+
+            const previousWeekId = getPreviousWeekId(currentWeekId);
+            if (!previousWeekId) return;
+
+            const itemsToMigrate = dashboardData.filter(item => 
+                item.week_id === previousWeekId && // Item belongs to the previous week
+                item.week_type === NEXT_WEEK_KEY && // Item was planned as 'Next Week'
+                (item.status === 'Planned' || item.status === 'In Progress') // Item was not completed
+            );
+            
+            if (itemsToMigrate.length === 0) return;
+            
+            const batch = writeBatch(db);
+            const releasesRef = collection(db, `/artifacts/${appId}/public/data/${COLLECTION_RELEASES}`);
+
+            console.log(`Attempting to migrate ${itemsToMigrate.length} items from ${previousWeekId} to ${currentWeekId} as Previous Releases.`);
+
+            itemsToMigrate.forEach(item => {
+                const docRef = doc(releasesRef, item.id);
+                batch.update(docRef, {
+                    week_id: currentWeekId, // Move item to the current week's view
+                    week_type: PREV_WEEK_KEY, // Relabel it as a previous/carry-over item
+                    updatedBy: userId,
+                    updatedTimestamp: new Date().toISOString()
+                });
+            });
+
+            try {
+                await batch.commit();
+                console.log(`Successfully migrated ${itemsToMigrate.length} items to ${currentWeekId}.`);
+            } catch (error) {
+                console.error("Error during release migration batch commit:", error);
+            }
+        };
+
+        const setupRealtimeListener = () => {
+            const releasesRef = collection(db, `/artifacts/${appId}/public/data/${COLLECTION_RELEASES}`);
+
+            onSnapshot(releasesRef, async (snapshot) => {
+                dashboardData = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+                loadingIndicator.classList.add('hidden');
+                
+                // Run migration check every time the data changes
+                if (isAuthReady) {
+                     await migrateReleases(); // This will trigger another snapshot update if successful
+                }
+
+                renderTimeline(); 
+                renderDashboard();
+            }, (error) => {
+                console.error("Firestore real-time listener failed:", error);
+                loadingIndicator.textContent = "Error fetching data.";
+            });
+        };
+
+        // --- ADMIN SETTINGS LOGIC ---
+        
+        window.openSettingsModal = () => { // Expose to window
+            // Load current settings into the text areas
+            podsInput.value = PODS.join('\n');
+            weekTypesInput.value = WEEK_TYPE_OPTIONS.join('\n');
+            customWeeksInput.value = CUSTOM_WEEKS.join('\n'); 
+            
+            settingsModal.classList.remove('hidden');
+            setTimeout(() => {
+                settingsModalContent.classList.remove('scale-95', 'opacity-0');
+                settingsModalContent.classList.add('scale-100', 'opacity-100');
+            }, 10);
+        };
+        
+        window.closeSettingsModal = () => { // Expose to window
+            settingsModalContent.classList.remove('scale-100', 'opacity-100');
+            settingsModalContent.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                settingsModal.classList.add('hidden');
+            }, 300);
+        };
+        
+        settingsForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const newPods = podsInput.value.split('\n').map(s => s.trim()).filter(s => s.length > 0);
+            const newWeekTypes = weekTypesInput.value.split('\n').map(s => s.trim()).filter(s => s.length > 0);
+            
+            // NEW: Parse and filter custom weeks, ensuring valid format W##_YYYY
+            const newCustomWeeks = customWeeksInput.value.split('\n')
+                .map(s => s.trim())
+                .filter(s => s.match(/^W\d{2}_\d{4}$/))
+                .sort(); // Keep them sorted
+
+            if (newPods.length === 0) {
+                console.error("Pod list cannot be empty.");
+                return;
+            }
+            if (newWeekTypes.length === 0) {
+                 console.error("Category Options list cannot be empty.");
+                 return;
+            }
+            if (newCustomWeeks.length === 0) {
+                 console.error("Custom Weeks list cannot be empty. Please enter weeks in W##_YYYY format.");
+                 return;
+            }
+
+            try {
+                // The onSnapshot listener will handle updating global variables and rerendering
+                await updateDoc(settingsRef(), {
+                    pods: newPods,
+                    weekTypes: newWeekTypes, // Update categories for the form
+                    customWeeks: newCustomWeeks, 
+                    updatedBy: userId,
+                    updatedTimestamp: new Date().toISOString()
+                });
+                
+                window.closeSettingsModal();
+            } catch (error) {
+                console.error('Error saving admin settings:', error);
+            }
+        });
+        
+        closeSettingsModalBtn.addEventListener('click', window.closeSettingsModal);
+
+        // --- RENDERING ---
+
+        const renderTimeline = () => {
+            // 1. Get all unique week IDs from the data
+            const weeksInData = new Set(dashboardData.map(d => d.week_id).filter(w => w));
+            
+            // 2. Get the custom weeks from settings
+            const weeksInSettings = new Set(CUSTOM_WEEKS);
+            
+            // 3. Combine all weeks, including the currently selected one
+            const allUniqueWeeks = new Set([...weeksInData, ...weeksInSettings, currentWeekId].filter(w => w));
+
+            const allWeekIds = Array.from(allUniqueWeeks);
+
+            // Sort: YYYY then WW, ascending (oldest first for a timeline view)
+             allWeekIds.sort((a, b) => {
+                const [wA, yA] = a.slice(1).split('_').map(Number);
+                const [wB, yB] = b.slice(1).split('_').map(Number);
+                if (yA !== yB) return yA - yB;
+                return wA - wB;
+            });
+            
+            // Show up to 10 weeks, focusing on the ones around the current week
+            let weeksToShow;
+            const currentIndex = allWeekIds.indexOf(currentWeekId);
+            if (currentIndex !== -1) {
+                // Show 3 before, current, and 6 after, capping at 10 total
+                const start = Math.max(0, currentIndex - 3);
+                const end = Math.min(allWeekIds.length, start + 10);
+                weeksToShow = allWeekIds.slice(start, end);
+            } else {
+                // If current week isn't in the list, just show the last 10
+                weeksToShow = allWeekIds.slice(-10); 
+            }
+
+            weekSelectorContainer.innerHTML = '';
+
+            weeksToShow.forEach(weekId => {
+                const weekLabel = weekToLabel(weekId);
+                const isActive = weekId === currentWeekId;
+                
+                const button = document.createElement('button');
+                button.textContent = weekLabel;
+                button.value = weekId;
+                button.className = `px-4 py-2 font-medium rounded-full text-sm transition duration-150 flex-shrink-0 whitespace-nowrap ${
+                    isActive 
+                        ? 'main-button text-white shadow-md' 
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`;
+                
+                button.addEventListener('click', () => {
+                    currentWeekId = weekId;
+                    currentWeekDisplay.textContent = weekLabel;
+                    renderTimeline(); 
+                    renderDashboard();
+                    migrateReleases(); // Also check migration upon week switch
+                });
+                
+                weekSelectorContainer.appendChild(button);
+            });
+            
+            currentWeekDisplay.textContent = weekToLabel(currentWeekId);
+            lucide.createIcons();
+        };
+
+        const renderPodFilters = () => {
+            podFilterList.innerHTML = '';
+            const allButton = createFilterButton('All');
+            podFilterList.appendChild(allButton);
+
+            PODS.forEach(pod => {
+                podFilterList.appendChild(createFilterButton(pod));
+            });
+        };
+
+        const createFilterButton = (label) => {
+            const button = document.createElement('button');
+            const isActive = label === currentFilter;
+            button.textContent = label;
+            button.className = `px-3 py-1 text-sm font-medium rounded-lg transition duration-150 ${
+                isActive 
+                    ? 'main-button text-white shadow-inner' 
+                    : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'
+            }`;
+            button.addEventListener('click', () => {
+                currentFilter = label;
+                renderPodFilters(); 
+                renderDashboard();
+            });
+            return button;
+        };
+
+
+        const renderDashboard = () => {
+            // 1. Filter by Pod (if selected)
+            const filteredByPod = currentFilter === 'All'
+                ? dashboardData
+                : dashboardData.filter(item => item.pod === currentFilter);
+            
+            // 2. Filter by Current Week ID
+            const filteredData = filteredByPod.filter(item => item.week_id === currentWeekId);
+
+            // 3. Explicitly segment data using the three fixed UI keys
+            const previousItems = filteredData.filter(item => item.week_type === PREV_WEEK_KEY)
+                .sort((a, b) => PRIORITY_OPTIONS.indexOf(a.priority) - PRIORITY_OPTIONS.indexOf(b.priority));
+                
+            const nextItems = filteredData.filter(item => item.week_type === NEXT_WEEK_KEY)
+                .sort((a, b) => PRIORITY_OPTIONS.indexOf(a.priority) - PRIORITY_OPTIONS.indexOf(b.priority));
+                
+            const blockerItems = filteredData.filter(item => item.week_type === BLOCKER_KEY)
+                .sort((a, b) => PRIORITY_OPTIONS.indexOf(a.priority) - PRIORITY_OPTIONS.indexOf(b.priority));
+
+            // 4. Render the three main sections using the fixed data keys
+            previousReleasesDiv.innerHTML = createCard('Previous Releases (Carry Over)', previousItems, 'text-blue-600', "No previous releases or carry-overs logged for this week.", PREV_WEEK_KEY);
+            nextReleasesDiv.innerHTML = createCard('Current & Next Releases (Planned)', nextItems, 'text-green-600', "No planned releases for this week.", NEXT_WEEK_KEY);
+            blockersSectionDiv.innerHTML = createCard('Current Blockers', blockerItems, 'text-red-600', "Zero critical blockers! Good work.", BLOCKER_KEY);
+            
+            lucide.createIcons(); 
+        };
+        
+        const createCard = (title, data, countColor, emptyMessage, weekType) => {
+            let itemsHtml = '';
+            if (data.length === 0) {
+                itemsHtml = `<p class="text-gray-500 italic p-4 text-center">🎉 ${emptyMessage}</p>`;
+            } else {
+                itemsHtml = data.map(item => `
+                    <div id="item-${item.id}" class="bg-white p-3 rounded-lg border border-gray-200 shadow-sm flex justify-between items-center">
+                        <div class="flex-grow">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-sm font-semibold text-gray-700">${item.key} - ${item.pod}</span>
+                                ${createPriorityBadge(item.priority)}
+                            </div>
+                            <p class="text-sm text-gray-900 font-medium leading-tight">${item.summary}</p>
+                            <p class="text-xs text-gray-500 mt-1">
+                                Owner: ${item.owner} | Status: <span class="font-semibold ${item.status === 'Released' ? 'text-green-600' : 'text-blue-600'}">${item.status}</span>
+                            </p>
+                        </div>
+                        <div class="flex space-x-2 ml-4 flex-shrink-0 edit-icon no-print">
+                            <button onclick="window.editItem('${item.id}')" class="text-primary hover:opacity-80 p-1 rounded-full bg-primary bg-opacity-10 transition duration-150" title="Edit Item">
+                                <i data-lucide="edit-3" class="w-4 h-4"></i>
+                            </button>
+                            <button onclick="window.deleteItemConfirmation('${item.id}')" class="text-red-500 hover:text-red-700 p-1 rounded-full bg-red-100 transition duration-150" title="Delete Item">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            }
+            
+            return `
+                <div class="bg-white shadow-xl rounded-xl p-5 flex flex-col h-full transition duration-300 hover:shadow-2xl">
+                    <div class="flex justify-between items-center mb-4 border-b pb-3 border-gray-200">
+                        <h2 class="text-xl font-bold text-gray-800">${title}</h2>
+                        <div class="flex items-center space-x-3 no-clutter no-print">
+                            <button 
+                                onclick="window.openModal(true, '${weekType}')"
+                                class="p-1 text-white main-button rounded-full hover:shadow-md transition duration-150"
+                                title="Add New Item to ${title}"
+                            >
+                                <i data-lucide="plus" class="w-5 h-5"></i>
+                            </button>
+                            <span class="text-3xl font-extrabold ${countColor}">${data.length}</span>
+                        </div>
+                    </div>
+                    <div class="space-y-3 overflow-y-auto flex-grow">
+                        ${itemsHtml}
+                    </div>
+                </div>
+            `;
+        };
+        
+        // --- MODAL/FORM HANDLING ---
+        
+        window.editItem = (id) => { // Expose to window for inline HTML access
+            const item = dashboardData.find(d => d.id === id);
+            if (!item) return;
+
+            document.getElementById('modal-title').textContent = `Edit Release Item: ${item.key}`;
+            document.getElementById('item-id-input').value = item.id;
+            document.getElementById('key-input').value = item.key;
+            document.getElementById('owner-input').value = item.owner;
+            document.getElementById('summary-input').value = item.summary;
+            document.getElementById('week-input').value = item.week_id;
+
+            // Populate selects with *current* options and set the item's saved value
+            populateSelect('pod-select-form', PODS);
+            document.getElementById('pod-select-form').querySelector('select').value = item.pod;
+            
+            populateSelect('priority-select-form', PRIORITY_OPTIONS);
+            document.getElementById('priority-select-form').querySelector('select').value = item.priority;
+            
+            populateSelect('category-select-form', WEEK_TYPE_OPTIONS); // Use dynamically loaded list
+            document.getElementById('category-select-form').querySelector('select').value = item.week_type;
+            
+            populateSelect('status-select-form', STATUS_OPTIONS);
+            document.getElementById('status-select-form').querySelector('select').value = item.status;
+            
+            openModal(false);
+        };
+
+        window.deleteItemConfirmation = async (itemId) => {
+            const item = dashboardData.find(d => d.id === itemId);
+            if (!item) return;
+
+            // Using window.confirm() as a temporary measure.
+            const confirmed = window.confirm(`Are you sure you want to delete item: ${item.key} - ${item.summary}?`);
+            if (confirmed) {
+                await deleteItem(itemId);
+            }
+        };
+
+        const deleteItem = async (itemId) => {
+            try {
+                const releasesRef = collection(db, `/artifacts/${appId}/public/data/${COLLECTION_RELEASES}`);
+                await deleteDoc(doc(releasesRef, itemId));
+                console.log(`Item ${itemId} deleted successfully.`);
+            } catch (error) {
+                console.error(`Error deleting item ${itemId}:`, error);
+            }
+        };
+
+
+        window.openModal = (isNew = true, presetWeekType = null) => {
+            document.getElementById('modal-title').textContent = isNew ? "Add New Release Item" : "Edit Release Item";
+            document.getElementById('item-id-input').value = '';
+            document.getElementById('item-form').reset();
+            
+            // Always set current week ID for new items
+            document.getElementById('week-input').value = currentWeekId; 
+
+            // Populate selects with dynamic data
+            populateSelect('pod-select-form', PODS);
+            populateSelect('priority-select-form', PRIORITY_OPTIONS);
+            populateSelect('category-select-form', WEEK_TYPE_OPTIONS);
+            populateSelect('status-select-form', STATUS_OPTIONS);
+            
+            // Apply preset category if provided
+            if (presetWeekType) {
+                 const selectElement = document.getElementById('category-select-form').querySelector('select');
+                 // Check if the preset type is in the allowed options list
+                 if (WEEK_TYPE_OPTIONS.includes(presetWeekType)) {
+                    selectElement.value = presetWeekType;
+                 } else if (selectElement.options.length > 0) {
+                    // Fallback to the first available option if preset isn't in the custom list
+                    selectElement.value = selectElement.options[0].value;
+                 }
+                 
+                 // Also set status to 'Planned' by default for new items unless Blockers
+                 const statusSelect = document.getElementById('status-select-form').querySelector('select');
+                 if (presetWeekType === BLOCKER_KEY) {
+                     statusSelect.value = 'Blocked';
+                 } else if (statusSelect.options.length > 0 && statusSelect.value === 'Planned') {
+                     statusSelect.value = 'Planned';
+                 }
+            }
+
+
+            itemModal.classList.remove('hidden');
+            setTimeout(() => {
+                modalContent.classList.remove('scale-95', 'opacity-0');
+                modalContent.classList.add('scale-100', 'opacity-100');
+            }, 10);
+        };
+        
+        const closeModal = () => {
+            modalContent.classList.remove('scale-100', 'opacity-100');
+            modalContent.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                itemModal.classList.add('hidden');
+                itemForm.reset(); 
+            }, 300);
+        };
+
+        // Open Modal handler
+        // newItemBtn.addEventListener('click', () => openModal(true)); 
+        // NOTE: The main button now calls window.openModal(true, 'Next Week') directly in the HTML.
+        closeModalBtn.addEventListener('click', closeModal);
+        formCancelBtn.addEventListener('click', closeModal);
+        
+        // PDF Download Handler
+        pdfDownloadBtn.addEventListener('click', () => {
+            // This triggers the browser's native print dialog
+            window.print();
+        });
+
+        // Submit Form Handler (Saves/Updates to Firestore)
+        itemForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const submitButton = document.getElementById('form-submit-btn');
+            submitButton.disabled = true;
+            submitButton.textContent = 'Processing...';
+            
+            const formData = new FormData(e.target);
+            const itemData = {};
+            for (let [key, value] of formData.entries()) {
+                itemData[key] = value;
+            }
+            
+            const itemId = itemData.id;
+            delete itemData.id; 
+            
+            itemData.date = new Date().toISOString().split('T')[0];
+            const releasesRef = collection(db, `/artifacts/${appId}/public/data/${COLLECTION_RELEASES}`);
+
+            try {
+                if (itemId) {
+                    await updateDoc(doc(releasesRef, itemId), { ...itemData, updatedBy: userId });
+                } else {
+                    await addDoc(releasesRef, { ...itemData, createdBy: userId });
+                }
+                
+                closeModal();
+            } catch (error) {
+                console.error('Error saving item to Firestore:', error);
+            } finally {
+                submitButton.disabled = false;
+                submitButton.textContent = 'Save Item';
+            }
+        });
+
+        // --- Application Initialization ---
+
+        window.onload = () => {
+            authenticateAndInit();
+            lucide.createIcons();
+        };
+
+    </script>
+</body>
+</html>
