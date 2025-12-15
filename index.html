@@ -99,7 +99,8 @@
         body.presentation-mode .controls,
         body.presentation-mode .footer-controls,
         /* NEW: Hide PDF button in presentation mode */
-        body.presentation-mode #pdf-download-btn { 
+        body.presentation-mode #pdf-download-btn,
+        body.presentation-mode #confirmation-modal { 
             display: none !important;
         }
         /* Ensure the main grid takes full width in presentation mode */
@@ -116,6 +117,10 @@
             }
             header, footer, .controls { border: none !important; }
             #pdf-download-btn { display: none !important; } /* Hide for actual printing */
+            /* Ensure modal content is hidden in print */
+            #item-modal, #theme-modal, #settings-modal, #confirmation-modal {
+                display: none !important;
+            }
         }
     </style>
     <!-- Lucide icons for professional look (e.g., edit, trash) -->
@@ -154,7 +159,7 @@
 
         <!-- Timeline / Week Selector -->
         <div class="controls mb-6 p-4 bg-white rounded-xl shadow-lg no-clutter no-print">
-            <h3 class="text-base font-semibold text-gray-700 mb-3">Release Timeline (Current Week: <span id="current-week-display" class="font-bold text-primary"></span>)</h3>
+            <h3 class="text-base font-semibold text-gray-700 mb-3">Release Timeline (Current Focus: <span id="current-week-display" class="font-bold text-primary"></span>)</h3>
             <div id="week-selector-container" class="flex overflow-x-auto space-x-2 pb-2">
                 <!-- Week buttons generated here -->
             </div>
@@ -325,7 +330,7 @@
                 <div>
                     <label for="week-types-input" class="block text-sm font-bold text-gray-700 mb-2">Editable Category Options (One item per line):</label>
                     <textarea id="week-types-input" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary p-3 border focus-primary" placeholder="Enter one category per line."></textarea>
-                    <p class="text-xs text-gray-500 mt-1">These populate the 'Category' dropdown when adding items. Existing items using 'Next Week', 'Previous Week', or 'Blocker' will still appear in the dashboard sections.</p>
+                    <p class="text-xs text-gray-500 mt-1">These populate the 'Category' dropdown when adding items. Fixed options (Next Week, Previous Week, Blocker) are always included.</p>
                 </div>
                 
                 <!-- Custom Weeks Editor -->
@@ -349,7 +354,7 @@
         // --- Firebase SDK Imports ---
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, onSnapshot, addDoc, doc, setDoc, updateDoc, deleteDoc, writeBatch, getDocs, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, onSnapshot, addDoc, doc, setDoc, updateDoc, deleteDoc, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // IMPORTANT: Enable debug logging for Firestore
         setLogLevel('Debug');
@@ -432,11 +437,15 @@
                 this.innerHTML = `
                     <div>
                         <label for="${this.id}" class="block text-sm font-medium text-gray-700">${this.getAttribute('label')}</label>
-                        <select id="${this.id}" name="${this.getAttribute('name')}" 
+                        <select id="${this.id}-select" name="${this.getAttribute('name')}" 
                             class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary p-2 border focus-primary"
                         ></select>
                     </div>
                 `;
+            }
+            // Ensure the select element ID is correct for use in forms
+            get selectElement() {
+                return this.querySelector('select');
             }
         }
         customElements.define('label-select', LabelSelect);
@@ -458,7 +467,7 @@
         `;
         
         const populateSelect = (id, options) => {
-            const selectElement = document.getElementById(id)?.querySelector('select');
+            const selectElement = document.getElementById(id)?.selectElement;
             if (!selectElement) return;
             selectElement.innerHTML = '';
             options.forEach(optionText => {
@@ -479,18 +488,17 @@
             const weekNumber = parseInt(w, 10);
             const year = y.slice(2);
             
-            let monthLabel = '';
-            if (weekNumber >= 40) monthLabel = 'Q4';
-            else if (weekNumber >= 26) monthLabel = 'Q3';
-            else if (weekNumber >= 13) monthLabel = 'Q2';
-            else monthLabel = 'Q1';
+            let quarterLabel = '';
+            if (weekNumber >= 40) quarterLabel = 'Q4';
+            else if (weekNumber >= 26) quarterLabel = 'Q3';
+            else if (weekNumber >= 13) quarterLabel = 'Q2';
+            else quarterLabel = 'Q1';
 
-            return `W${w} (${monthLabel}'${year})`;
+            return `W${w} (${quarterLabel}'${year})`;
         };
         
         /**
          * Calculates the week ID immediately preceding the given week ID (Wxx_YYYY).
-         * Handles year rollover (W01_YYYY -> W52_YYYY-1).
          * Assumes 52 weeks per year for simplicity.
          */
         const getPreviousWeekId = (currentWeekId) => {
@@ -542,14 +550,21 @@
                     targetYear += 1;
                 }
 
-                if (targetYear >= y - 1) { // Limit to past year
+                if (targetYear >= y - 1 && targetYear <= y + 1) { // Limit range
                     defaultWeeks.push(`W${String(targetWeek).padStart(2, '0')}_${targetYear}`);
                 }
             }
+            // Sort them to ensure correct order
+            defaultWeeks.sort((a, b) => {
+                const [wA, yA] = a.slice(1).split('_').map(Number);
+                const [wB, yB] = b.slice(1).split('_').map(Number);
+                if (yA !== yB) return yA - yB;
+                return wA - wB;
+            });
             return [...new Set(defaultWeeks)]; // Ensure uniqueness
         }
         
-        // --- THEME LOGIC ---
+        // --- THEME LOGIC (Continued) ---
         
         // Expose to window for inline HTML access
         window.changeTheme = async (themeId) => {
@@ -567,10 +582,11 @@
                 body.classList.add('bg-gray-50'); 
             }
             
-            // 3. Persist to Firestore
+            // 3. Persist to Firestore (if DB is ready)
             try {
-                if (db) {
-                    await updateDoc(settingsRef(), { theme: themeId, updatedBy: userId, updatedTimestamp: new Date().toISOString() });
+                if (db && isAuthReady) {
+                    // Use setDoc with merge true to update only the theme field
+                    await setDoc(settingsRef(), { theme: themeId, updatedBy: userId, updatedTimestamp: new Date().toISOString() }, { merge: true });
                 }
             } catch (error) {
                 console.error('Error persisting theme:', error);
@@ -619,7 +635,8 @@
 
         closeThemeModalBtn.addEventListener('click', window.closeThemeModal);
         
-        // --- PRESENTATION MODE LOGIC ---
+        // --- PRESENTATION MODE LOGIC (Continued) ---
+        
         window.togglePresentationMode = () => {
             body.classList.toggle('presentation-mode');
             
@@ -641,540 +658,406 @@
             renderPodFilters(); 
         };
 
-        // Event listener for the Escape key 
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
+        // Event Listener for ESC key to exit presentation mode and close modals
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
                 if (body.classList.contains('presentation-mode')) {
                     window.togglePresentationMode();
-                } 
+                }
+                if (!itemModal.classList.contains('hidden')) window.closeModal();
+                if (!themeModal.classList.contains('hidden')) window.closeThemeModal();
+                if (!settingsModal.classList.contains('hidden')) window.closeSettingsModal();
+                
+                // Also hide the custom confirmation dialog
+                const confirmModal = document.getElementById('confirmation-modal');
+                if (confirmModal && !confirmModal.classList.contains('hidden')) {
+                    // To be implemented in showCustomConfirmation logic
+                }
             }
         });
-
-
-        // --- FIREBASE SETUP & DATA HANDLING ---
-
-        const authenticateAndInit = async () => {
+        
+        // --- FIREBASE INITIALIZATION & AUTHENTICATION ---
+        
+        const initFirebaseAndAuth = async () => {
             loadingIndicator.classList.remove('hidden');
-
+            
             try {
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
                 
+                // Sign in with custom token if available, otherwise anonymously
                 if (initialAuthToken) {
                     await signInWithCustomToken(auth, initialAuthToken);
                 } else {
                     await signInAnonymously(auth);
                 }
-
+                
                 userId = auth.currentUser?.uid || crypto.randomUUID();
-                userIdDisplay.textContent = userId; // Display the userId
+                userIdDisplay.textContent = userId;
                 isAuthReady = true;
 
-                currentWeekId = getCurrentWeekId();
-                currentWeekDisplay.textContent = weekToLabel(currentWeekId);
-
-                // 1. Fetch Settings (Theme, PODS, WEEK_TYPE_OPTIONS, CUSTOM_WEEKS)
-                await setupSettingsListener();
-
-                // 2. Setup mock data if empty
-                await checkAndPopulateMockData();
-
-                // 3. Set up real-time listener for release items
-                setupRealtimeListener();
+                // Start listeners
+                loadSettings();
+                listenForReleases();
 
             } catch (error) {
-                console.error("Firebase initialization or authentication failed:", error);
-                loadingIndicator.textContent = `Error loading dashboard: ${error.message}. Check console.`;
+                console.error("Firebase/Auth initialization failed:", error);
+                userIdDisplay.textContent = 'ERROR (Check Console)';
+            } finally {
+                loadingIndicator.classList.add('hidden');
             }
         };
-        
-        const settingsRef = () => doc(db, `/artifacts/${appId}/public/data/${COLLECTION_SETTINGS}/${SETTINGS_DOC_ID}`);
 
-        const setupSettingsListener = () => {
-            return new Promise((resolve) => {
-                onSnapshot(settingsRef(), (docSnapshot) => {
-                    let shouldRerender = false;
-                    
-                    if (docSnapshot.exists()) {
-                        const data = docSnapshot.data();
-                        
-                        // Theme update
-                        const newTheme = data.theme || 'default';
-                        if (newTheme !== currentTheme) {
-                            currentTheme = newTheme;
-                            setTimeout(() => window.changeTheme(currentTheme), 0); 
-                        }
-
-                        // Pods update
-                        const newPods = data.pods || PODS;
-                        if (JSON.stringify(newPods) !== JSON.stringify(PODS)) {
-                            PODS = newPods;
-                            shouldRerender = true;
-                        }
-
-                        // Week Types update (Options for the form's Category dropdown)
-                        const newWeekTypes = data.weekTypes || WEEK_TYPE_OPTIONS;
-                        if (JSON.stringify(newWeekTypes) !== JSON.stringify(WEEK_TYPE_OPTIONS)) {
-                            WEEK_TYPE_OPTIONS = newWeekTypes;
-                            // Rerender form selects, not dashboard, as this list doesn't affect data grouping
-                        }
-                        
-                        // Custom Weeks update
-                        const newCustomWeeks = data.customWeeks || getCustomWeeksDefault();
-                        if (JSON.stringify(newCustomWeeks) !== JSON.stringify(CUSTOM_WEEKS)) {
-                            CUSTOM_WEEKS = newCustomWeeks;
-                            shouldRerender = true;
-                        }
-
-                    } else {
-                        // If doc doesn't exist, create it with defaults
-                        setDoc(settingsRef(), { 
-                            theme: currentTheme, 
-                            pods: PODS, 
-                            weekTypes: WEEK_TYPE_OPTIONS, 
-                            customWeeks: getCustomWeeksDefault(), 
-                            createdBy: userId 
-                        });
-                        shouldRerender = true; 
-                    }
-                    
-                    if (shouldRerender && isAuthReady) {
-                        renderPodFilters(); 
-                        renderDashboard();
-                    }
-                    resolve();
-                }, (error) => {
-                    console.error("Error setting up settings listener:", error);
-                    resolve();
-                });
-            });
-        };
+        // --- FIREBASE REFERENCES ---
+        // Public settings reference
+        const settingsRef = () => doc(db, 'artifacts', appId, 'public', 'data', COLLECTION_SETTINGS, SETTINGS_DOC_ID);
+        // Public releases collection reference
+        const releasesCollection = () => collection(db, 'artifacts', appId, 'public', 'data', COLLECTION_RELEASES);
+        const releaseDocRef = (id) => doc(db, 'artifacts', appId, 'public', 'data', COLLECTION_RELEASES, id);
 
 
-        const checkAndPopulateMockData = async () => {
-             const releasesRef = collection(db, `/artifacts/${appId}/public/data/${COLLECTION_RELEASES}`);
-             const snapshot = await getDocs(releasesRef);
-
-            if (snapshot.empty) {
-                const batch = writeBatch(db);
-                
-                const currentId = getCurrentWeekId(); 
-                const previousId = getPreviousWeekId(currentId);
-                
-                // Use the fixed keys for mock data creation
-                const mockData = [
-                    // NEXT WEEK (Current Week - Planned)
-                    { pod: 'Demand and supply', key: 'DS-201', summary: 'New automated forecast model integration', priority: 'High', status: 'Planned', week_type: NEXT_WEEK_KEY, owner: 'Raja', week_id: currentId, date: new Date().toISOString().split('T')[0] },
-                    { pod: 'SLA', key: 'SLA-05', summary: 'Service level objective review and re-calibration', priority: 'Medium', status: 'Planned', week_type: NEXT_WEEK_KEY, owner: 'Priya', week_id: currentId, date: new Date().toISOString().split('T')[0] },
-                    
-                    // PREVIOUS WEEK (Last Week - Released)
-                    { pod: 'Loss reduction', key: 'LR-10', summary: 'Rollout of fraud detection module v2.0', priority: 'Critical', status: 'Released', week_type: PREV_WEEK_KEY, owner: 'Ganesh', week_id: previousId, date: new Date().toISOString().split('T')[0] },
-                    { pod: 'Customer Experience', key: 'CX-44', summary: 'Mobile app dark mode feature launch', priority: 'Medium', status: 'Released', week_type: PREV_WEEK_KEY, owner: 'Sneha', week_id: previousId, date: new Date().toISOString().split('T')[0] },
-                    
-                    // ITEM THAT SHOULD BE ROLLED OVER (Last Week - Planned, but not released)
-                    { pod: 'High yield client', key: 'HY-ROLL', summary: 'High-value contract signing pre-work', priority: 'High', status: 'Planned', week_type: NEXT_WEEK_KEY, owner: 'Vikram', week_id: previousId, date: new Date().toISOString().split('T')[0] },
-
-                    // BLOCKERS (Current Week)
-                    { pod: 'Demand and supply', key: 'DS-BLOCK', summary: 'Critical data source migration postponed', priority: 'Critical', status: 'Blocked', week_type: BLOCKER_KEY, owner: 'Raja', week_id: currentId, date: new Date().toISOString().split('T')[0] },
-                ];
-
-                mockData.forEach((item) => {
-                    const docRef = doc(releasesRef); 
-                    batch.set(docRef, item);
-                });
-
-                await batch.commit();
-                console.log("Mock data populated successfully.");
-            }
-        };
-        
-        /**
-         * Migrates unreleased items from the previous week's 'Next Week' category
-         * to the current week's 'Previous Week' category.
-         */
-        const migrateReleases = async () => {
-            if (!db || !currentWeekId) return;
-
-            const previousWeekId = getPreviousWeekId(currentWeekId);
-            if (!previousWeekId) return;
-
-            const itemsToMigrate = dashboardData.filter(item => 
-                item.week_id === previousWeekId && // Item belongs to the previous week
-                item.week_type === NEXT_WEEK_KEY && // Item was planned as 'Next Week'
-                (item.status === 'Planned' || item.status === 'In Progress') // Item was not completed
-            );
-            
-            if (itemsToMigrate.length === 0) return;
-            
-            const batch = writeBatch(db);
-            const releasesRef = collection(db, `/artifacts/${appId}/public/data/${COLLECTION_RELEASES}`);
-
-            console.log(`Attempting to migrate ${itemsToMigrate.length} items from ${previousWeekId} to ${currentWeekId} as Previous Releases.`);
-
-            itemsToMigrate.forEach(item => {
-                const docRef = doc(releasesRef, item.id);
-                batch.update(docRef, {
-                    week_id: currentWeekId, // Move item to the current week's view
-                    week_type: PREV_WEEK_KEY, // Relabel it as a previous/carry-over item
-                    updatedBy: userId,
-                    updatedTimestamp: new Date().toISOString()
-                });
-            });
+        // --- SETTINGS MANAGEMENT (Admin Configuration) ---
+        const loadSettings = async () => {
+            if (!isAuthReady || !db) return;
 
             try {
-                await batch.commit();
-                console.log(`Successfully migrated ${itemsToMigrate.length} items to ${currentWeekId}.`);
+                // Real-time listener for app settings
+                onSnapshot(settingsRef(), (docSnapshot) => {
+                    const settings = docSnapshot.data() || {};
+                    
+                    // 1. Update Pods
+                    PODS = settings.pods && Array.isArray(settings.pods) && settings.pods.length > 0
+                        ? settings.pods
+                        : ['Demand and supply', 'SLA', 'Loss reduction', 'Customer Experience', 'High yield client'];
+                    
+                    // 2. Update Week Types (Categories for form)
+                    WEEK_TYPE_OPTIONS = [NEXT_WEEK_KEY, PREV_WEEK_KEY, BLOCKER_KEY]; // Reset fixed keys
+                    if (settings.weekTypes && Array.isArray(settings.weekTypes) && settings.weekTypes.length > 0) {
+                        settings.weekTypes.forEach(wt => {
+                            if (!WEEK_TYPE_OPTIONS.includes(wt)) {
+                                WEEK_TYPE_OPTIONS.push(wt);
+                            }
+                        });
+                    }
+
+                    // 3. Update Custom Weeks (Timeline selector)
+                    CUSTOM_WEEKS = settings.customWeeks && Array.isArray(settings.customWeeks) && settings.customWeeks.length > 0
+                        ? settings.customWeeks
+                        : getCustomWeeksDefault();
+                    
+                    // 4. Update Theme
+                    const loadedTheme = settings.theme || 'default';
+                    if (loadedTheme !== currentTheme) {
+                        window.changeTheme(loadedTheme); // Apply theme (and handle persistence update prevention within changeTheme)
+                    } else {
+                        // Re-render UI based on new settings (Pod filters might need updating regardless)
+                        renderFormSelects();
+                        renderPodFilters();
+                        renderWeekSelector();
+                    }
+
+                }, (error) => {
+                    console.error("Error listening to settings:", error);
+                });
             } catch (error) {
-                console.error("Error during release migration batch commit:", error);
+                console.error("Error setting up settings listener:", error);
             }
         };
 
-        const setupRealtimeListener = () => {
-            const releasesRef = collection(db, `/artifacts/${appId}/public/data/${COLLECTION_RELEASES}`);
-
-            onSnapshot(releasesRef, async (snapshot) => {
-                dashboardData = snapshot.docs.map(doc => ({
-                    id: doc.id,
-                    ...doc.data()
-                }));
-                loadingIndicator.classList.add('hidden');
-                
-                // Run migration check every time the data changes
-                if (isAuthReady) {
-                     await migrateReleases(); // This will trigger another snapshot update if successful
-                }
-
-                renderTimeline(); 
-                renderDashboard();
-            }, (error) => {
-                console.error("Firestore real-time listener failed:", error);
-                loadingIndicator.textContent = "Error fetching data.";
-            });
-        };
-
-        // --- ADMIN SETTINGS LOGIC ---
-        
-        window.openSettingsModal = () => { // Expose to window
-            // Load current settings into the text areas
-            podsInput.value = PODS.join('\n');
-            weekTypesInput.value = WEEK_TYPE_OPTIONS.join('\n');
-            customWeeksInput.value = CUSTOM_WEEKS.join('\n'); 
+        window.saveSettings = async (event) => {
+            event.preventDefault();
             
-            settingsModal.classList.remove('hidden');
-            setTimeout(() => {
-                settingsModalContent.classList.remove('scale-95', 'opacity-0');
-                settingsModalContent.classList.add('scale-100', 'opacity-100');
-            }, 10);
-        };
-        
-        window.closeSettingsModal = () => { // Expose to window
-            settingsModalContent.classList.remove('scale-100', 'opacity-100');
-            settingsModalContent.classList.add('scale-95', 'opacity-0');
-            setTimeout(() => {
-                settingsModal.classList.add('hidden');
-            }, 300);
-        };
-        
-        settingsForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
+            if (!isAuthReady || !db) {
+                console.error("Database not ready. Cannot save settings.");
+                return;
+            }
+
+            // Parse text area inputs
             const newPods = podsInput.value.split('\n').map(s => s.trim()).filter(s => s.length > 0);
             const newWeekTypes = weekTypesInput.value.split('\n').map(s => s.trim()).filter(s => s.length > 0);
             
-            // NEW: Parse and filter custom weeks, ensuring valid format W##_YYYY
-            const newCustomWeeks = customWeeksInput.value.split('\n')
-                .map(s => s.trim())
-                .filter(s => s.match(/^W\d{2}_\d{4}$/))
-                .sort(); // Keep them sorted
-
-            if (newPods.length === 0) {
-                console.error("Pod list cannot be empty.");
-                return;
-            }
-            if (newWeekTypes.length === 0) {
-                 console.error("Category Options list cannot be empty.");
-                 return;
-            }
-            if (newCustomWeeks.length === 0) {
-                 console.error("Custom Weeks list cannot be empty. Please enter weeks in W##_YYYY format.");
-                 return;
-            }
+            // Filter custom weeks for correct format: W##_YYYY
+            const newCustomWeeks = customWeeksInput.value.split('\n').map(s => s.trim()).filter(s => s.length > 0 && s.match(/^W\d{2}_\d{4}$/));
 
             try {
-                // The onSnapshot listener will handle updating global variables and rerendering
-                await updateDoc(settingsRef(), {
+                await setDoc(settingsRef(), {
                     pods: newPods,
-                    weekTypes: newWeekTypes, // Update categories for the form
-                    customWeeks: newCustomWeeks, 
+                    weekTypes: newWeekTypes,
+                    customWeeks: newCustomWeeks,
+                    theme: currentTheme, // Keep current theme
                     updatedBy: userId,
                     updatedTimestamp: new Date().toISOString()
-                });
-                
+                }, { merge: true });
+
+                console.log("Settings saved successfully.");
                 window.closeSettingsModal();
             } catch (error) {
-                console.error('Error saving admin settings:', error);
+                console.error("Error saving settings:", error);
             }
-        });
-        
-        closeSettingsModalBtn.addEventListener('click', window.closeSettingsModal);
-
-        // --- RENDERING ---
-
-        const renderTimeline = () => {
-            // 1. Get all unique week IDs from the data
-            const weeksInData = new Set(dashboardData.map(d => d.week_id).filter(w => w));
-            
-            // 2. Get the custom weeks from settings
-            const weeksInSettings = new Set(CUSTOM_WEEKS);
-            
-            // 3. Combine all weeks, including the currently selected one
-            const allUniqueWeeks = new Set([...weeksInData, ...weeksInSettings, currentWeekId].filter(w => w));
-
-            const allWeekIds = Array.from(allUniqueWeeks);
-
-            // Sort: YYYY then WW, ascending (oldest first for a timeline view)
-             allWeekIds.sort((a, b) => {
-                const [wA, yA] = a.slice(1).split('_').map(Number);
-                const [wB, yB] = b.slice(1).split('_').map(Number);
-                if (yA !== yB) return yA - yB;
-                return wA - wB;
-            });
-            
-            // Show up to 10 weeks, focusing on the ones around the current week
-            let weeksToShow;
-            const currentIndex = allWeekIds.indexOf(currentWeekId);
-            if (currentIndex !== -1) {
-                // Show 3 before, current, and 6 after, capping at 10 total
-                const start = Math.max(0, currentIndex - 3);
-                const end = Math.min(allWeekIds.length, start + 10);
-                weeksToShow = allWeekIds.slice(start, end);
-            } else {
-                // If current week isn't in the list, just show the last 10
-                weeksToShow = allWeekIds.slice(-10); 
-            }
-
-            weekSelectorContainer.innerHTML = '';
-
-            weeksToShow.forEach(weekId => {
-                const weekLabel = weekToLabel(weekId);
-                const isActive = weekId === currentWeekId;
-                
-                const button = document.createElement('button');
-                button.textContent = weekLabel;
-                button.value = weekId;
-                button.className = `px-4 py-2 font-medium rounded-full text-sm transition duration-150 flex-shrink-0 whitespace-nowrap ${
-                    isActive 
-                        ? 'main-button text-white shadow-md' 
-                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`;
-                
-                button.addEventListener('click', () => {
-                    currentWeekId = weekId;
-                    currentWeekDisplay.textContent = weekLabel;
-                    renderTimeline(); 
-                    renderDashboard();
-                    migrateReleases(); // Also check migration upon week switch
-                });
-                
-                weekSelectorContainer.appendChild(button);
-            });
-            
-            currentWeekDisplay.textContent = weekToLabel(currentWeekId);
-            lucide.createIcons();
         };
 
-        const renderPodFilters = () => {
-            podFilterList.innerHTML = '';
-            const allButton = createFilterButton('All');
-            podFilterList.appendChild(allButton);
+        // --- DATA MANAGEMENT (Releases) ---
+        const listenForReleases = () => {
+            if (!isAuthReady || !db) return;
 
-            PODS.forEach(pod => {
-                podFilterList.appendChild(createFilterButton(pod));
-            });
-        };
-
-        const createFilterButton = (label) => {
-            const button = document.createElement('button');
-            const isActive = label === currentFilter;
-            button.textContent = label;
-            button.className = `px-3 py-1 text-sm font-medium rounded-lg transition duration-150 ${
-                isActive 
-                    ? 'main-button text-white shadow-inner' 
-                    : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'
-            }`;
-            button.addEventListener('click', () => {
-                currentFilter = label;
-                renderPodFilters(); 
+            // Real-time listener for the releases collection
+            onSnapshot(releasesCollection(), (snapshot) => {
+                // Map documents to include the document ID
+                dashboardData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                console.log(`Loaded ${dashboardData.length} release items.`);
+                // Re-render dashboard on any data change
                 renderDashboard();
+            }, (error) => {
+                console.error("Error listening to releases:", error);
             });
-            return button;
         };
 
+        window.saveReleaseItem = async (event) => {
+            event.preventDefault();
+            if (!isAuthReady || !db) return;
 
-        const renderDashboard = () => {
-            // 1. Filter by Pod (if selected)
-            const filteredByPod = currentFilter === 'All'
-                ? dashboardData
-                : dashboardData.filter(item => item.pod === currentFilter);
+            const form = event.target;
+            const data = {
+                key: form['key'].value.trim(),
+                owner: form['owner'].value.trim(),
+                summary: form['summary'].value.trim(),
+                pod: form['pod'].value,
+                priority: form['priority'].value,
+                status: form['status'].value,
+                week_type: form['week_type'].value,
+                week_id: form['week_id'].value.trim(),
+                updatedBy: userId,
+                updatedTimestamp: new Date().toISOString()
+            };
             
-            // 2. Filter by Current Week ID
-            const filteredData = filteredByPod.filter(item => item.week_id === currentWeekId);
+            const itemId = form['id'].value;
 
-            // 3. Explicitly segment data using the three fixed UI keys
-            const previousItems = filteredData.filter(item => item.week_type === PREV_WEEK_KEY)
-                .sort((a, b) => PRIORITY_OPTIONS.indexOf(a.priority) - PRIORITY_OPTIONS.indexOf(b.priority));
-                
-            const nextItems = filteredData.filter(item => item.week_type === NEXT_WEEK_KEY)
-                .sort((a, b) => PRIORITY_OPTIONS.indexOf(a.priority) - PRIORITY_OPTIONS.indexOf(b.priority));
-                
-            const blockerItems = filteredData.filter(item => item.week_type === BLOCKER_KEY)
-                .sort((a, b) => PRIORITY_OPTIONS.indexOf(a.priority) - PRIORITY_OPTIONS.indexOf(b.priority));
-
-            // 4. Render the three main sections using the fixed data keys
-            previousReleasesDiv.innerHTML = createCard('Previous Releases (Carry Over)', previousItems, 'text-blue-600', "No previous releases or carry-overs logged for this week.", PREV_WEEK_KEY);
-            nextReleasesDiv.innerHTML = createCard('Current & Next Releases (Planned)', nextItems, 'text-green-600', "No planned releases for this week.", NEXT_WEEK_KEY);
-            blockersSectionDiv.innerHTML = createCard('Current Blockers', blockerItems, 'text-red-600', "Zero critical blockers! Good work.", BLOCKER_KEY);
-            
-            lucide.createIcons(); 
-        };
-        
-        const createCard = (title, data, countColor, emptyMessage, weekType) => {
-            let itemsHtml = '';
-            if (data.length === 0) {
-                itemsHtml = `<p class="text-gray-500 italic p-4 text-center">🎉 ${emptyMessage}</p>`;
-            } else {
-                itemsHtml = data.map(item => `
-                    <div id="item-${item.id}" class="bg-white p-3 rounded-lg border border-gray-200 shadow-sm flex justify-between items-center">
-                        <div class="flex-grow">
-                            <div class="flex justify-between items-center mb-1">
-                                <span class="text-sm font-semibold text-gray-700">${item.key} - ${item.pod}</span>
-                                ${createPriorityBadge(item.priority)}
-                            </div>
-                            <p class="text-sm text-gray-900 font-medium leading-tight">${item.summary}</p>
-                            <p class="text-xs text-gray-500 mt-1">
-                                Owner: ${item.owner} | Status: <span class="font-semibold ${item.status === 'Released' ? 'text-green-600' : 'text-blue-600'}">${item.status}</span>
-                            </p>
-                        </div>
-                        <div class="flex space-x-2 ml-4 flex-shrink-0 edit-icon no-print">
-                            <button onclick="window.editItem('${item.id}')" class="text-primary hover:opacity-80 p-1 rounded-full bg-primary bg-opacity-10 transition duration-150" title="Edit Item">
-                                <i data-lucide="edit-3" class="w-4 h-4"></i>
-                            </button>
-                            <button onclick="window.deleteItemConfirmation('${item.id}')" class="text-red-500 hover:text-red-700 p-1 rounded-full bg-red-100 transition duration-150" title="Delete Item">
-                                <i data-lucide="trash-2" class="w-4 h-4"></i>
-                            </button>
-                        </div>
-                    </div>
-                `).join('');
-            }
-            
-            return `
-                <div class="bg-white shadow-xl rounded-xl p-5 flex flex-col h-full transition duration-300 hover:shadow-2xl">
-                    <div class="flex justify-between items-center mb-4 border-b pb-3 border-gray-200">
-                        <h2 class="text-xl font-bold text-gray-800">${title}</h2>
-                        <div class="flex items-center space-x-3 no-clutter no-print">
-                            <button 
-                                onclick="window.openModal(true, '${weekType}')"
-                                class="p-1 text-white main-button rounded-full hover:shadow-md transition duration-150"
-                                title="Add New Item to ${title}"
-                            >
-                                <i data-lucide="plus" class="w-5 h-5"></i>
-                            </button>
-                            <span class="text-3xl font-extrabold ${countColor}">${data.length}</span>
-                        </div>
-                    </div>
-                    <div class="space-y-3 overflow-y-auto flex-grow">
-                        ${itemsHtml}
-                    </div>
-                </div>
-            `;
-        };
-        
-        // --- MODAL/FORM HANDLING ---
-        
-        window.editItem = (id) => { // Expose to window for inline HTML access
-            const item = dashboardData.find(d => d.id === id);
-            if (!item) return;
-
-            document.getElementById('modal-title').textContent = `Edit Release Item: ${item.key}`;
-            document.getElementById('item-id-input').value = item.id;
-            document.getElementById('key-input').value = item.key;
-            document.getElementById('owner-input').value = item.owner;
-            document.getElementById('summary-input').value = item.summary;
-            document.getElementById('week-input').value = item.week_id;
-
-            // Populate selects with *current* options and set the item's saved value
-            populateSelect('pod-select-form', PODS);
-            document.getElementById('pod-select-form').querySelector('select').value = item.pod;
-            
-            populateSelect('priority-select-form', PRIORITY_OPTIONS);
-            document.getElementById('priority-select-form').querySelector('select').value = item.priority;
-            
-            populateSelect('category-select-form', WEEK_TYPE_OPTIONS); // Use dynamically loaded list
-            document.getElementById('category-select-form').querySelector('select').value = item.week_type;
-            
-            populateSelect('status-select-form', STATUS_OPTIONS);
-            document.getElementById('status-select-form').querySelector('select').value = item.status;
-            
-            openModal(false);
-        };
-
-        window.deleteItemConfirmation = async (itemId) => {
-            const item = dashboardData.find(d => d.id === itemId);
-            if (!item) return;
-
-            // Using window.confirm() as a temporary measure.
-            const confirmed = window.confirm(`Are you sure you want to delete item: ${item.key} - ${item.summary}?`);
-            if (confirmed) {
-                await deleteItem(itemId);
-            }
-        };
-
-        const deleteItem = async (itemId) => {
             try {
-                const releasesRef = collection(db, `/artifacts/${appId}/public/data/${COLLECTION_RELEASES}`);
-                await deleteDoc(doc(releasesRef, itemId));
-                console.log(`Item ${itemId} deleted successfully.`);
+                if (itemId) {
+                    // Update existing item
+                    await updateDoc(releaseDocRef(itemId), data);
+                    console.log("Item updated:", itemId);
+                } else {
+                    // Add new item
+                    await addDoc(releasesCollection(), { 
+                        ...data,
+                        createdBy: userId,
+                        createdTimestamp: new Date().toISOString()
+                    });
+                    console.log("New item added.");
+                }
+                window.closeModal();
             } catch (error) {
-                console.error(`Error deleting item ${itemId}:`, error);
+                console.error("Error saving release item:", error);
             }
         };
 
+        window.deleteReleaseItem = async (itemId) => {
+             if (!isAuthReady || !db) return;
 
-        window.openModal = (isNew = true, presetWeekType = null) => {
-            document.getElementById('modal-title').textContent = isNew ? "Add New Release Item" : "Edit Release Item";
-            document.getElementById('item-id-input').value = '';
-            document.getElementById('item-form').reset();
-            
-            // Always set current week ID for new items
-            document.getElementById('week-input').value = currentWeekId; 
+             // Use the custom confirmation modal
+             const confirmDelete = await showCustomConfirmation(
+                "Confirm Delete",
+                "Are you sure you want to permanently delete this release item? This action cannot be undone."
+             );
+             
+             if (!confirmDelete) return;
 
-            // Populate selects with dynamic data
+             try {
+                await deleteDoc(releaseDocRef(itemId));
+                console.log("Item deleted:", itemId);
+             } catch (error) {
+                console.error("Error deleting release item:", error);
+             }
+        };
+
+
+        // --- UI RENDERING ---
+
+        const renderFormSelects = () => {
+            // Populate form selects (used in item modal)
             populateSelect('pod-select-form', PODS);
             populateSelect('priority-select-form', PRIORITY_OPTIONS);
             populateSelect('category-select-form', WEEK_TYPE_OPTIONS);
             populateSelect('status-select-form', STATUS_OPTIONS);
+        };
+
+        window.setPodFilter = (pod) => {
+            currentFilter = pod;
+            renderPodFilters(); // Re-render to highlight active filter
+            renderDashboard(); // Re-render dashboard content
+        };
+
+        const renderPodFilters = () => {
+            const allPods = ['All', ...PODS];
+            podFilterList.innerHTML = allPods.map(pod => {
+                const isActive = pod === currentFilter;
+                return `
+                    <button 
+                        class="px-3 py-1 text-xs font-semibold rounded-full transition duration-150 whitespace-nowrap
+                        ${isActive 
+                            ? 'text-white main-button shadow-md' 
+                            : 'text-gray-600 bg-gray-200 hover:bg-gray-300'
+                        }"
+                        onclick="window.setPodFilter('${pod}')"
+                    >
+                        ${pod}
+                    </button>
+                `;
+            }).join('');
+        };
+        
+        window.setCurrentWeek = (weekId) => {
+            currentWeekId = weekId;
+            currentWeekDisplay.textContent = weekToLabel(weekId);
+            renderWeekSelector(); // Re-render to highlight active week
+            renderDashboard(); // Re-render dashboard content
+        };
+
+        const renderWeekSelector = () => {
+            weekSelectorContainer.innerHTML = CUSTOM_WEEKS.map(weekId => {
+                const isActive = weekId === currentWeekId;
+                const weekLabel = weekToLabel(weekId);
+                const isCurrent = weekId === getCurrentWeekId();
+                
+                return `
+                    <button
+                        class="px-4 py-2 text-sm font-medium rounded-lg shadow-sm transition duration-150 flex-shrink-0 whitespace-nowrap
+                        ${isActive 
+                            ? 'text-white main-button shadow-xl ring-2 ring-primary ring-opacity-50' 
+                            : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                        }"
+                        onclick="window.setCurrentWeek('${weekId}')"
+                    >
+                        ${weekLabel} ${isCurrent ? '<span class="text-xs ml-1">(Current)</span>' : ''}
+                    </button>
+                `;
+            }).join('');
+
+             // If no week is selected, set the current one as default after rendering
+            if (!currentWeekId && CUSTOM_WEEKS.length > 0) {
+                 window.setCurrentWeek(getCurrentWeekId());
+             }
+        };
+
+        const renderReleaseItem = (item) => {
+            const priorityBadge = createPriorityBadge(item.priority);
             
-            // Apply preset category if provided
-            if (presetWeekType) {
-                 const selectElement = document.getElementById('category-select-form').querySelector('select');
-                 // Check if the preset type is in the allowed options list
-                 if (WEEK_TYPE_OPTIONS.includes(presetWeekType)) {
-                    selectElement.value = presetWeekType;
-                 } else if (selectElement.options.length > 0) {
-                    // Fallback to the first available option if preset isn't in the custom list
-                    selectElement.value = selectElement.options[0].value;
-                 }
-                 
-                 // Also set status to 'Planned' by default for new items unless Blockers
-                 const statusSelect = document.getElementById('status-select-form').querySelector('select');
-                 if (presetWeekType === BLOCKER_KEY) {
-                     statusSelect.value = 'Blocked';
-                 } else if (statusSelect.options.length > 0 && statusSelect.value === 'Planned') {
-                     statusSelect.value = 'Planned';
-                 }
+            return `
+                <div class="p-4 bg-white rounded-lg shadow-md border-l-4 border-primary hover:shadow-lg transition duration-200 mb-3 flex justify-between items-start">
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center space-x-3 mb-1">
+                            <h4 class="text-base font-semibold text-gray-800 truncate">${item.key} - ${item.summary}</h4>
+                            ${priorityBadge}
+                            <span class="px-2 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-600">${item.pod}</span>
+                        </div>
+                        <p class="text-sm text-gray-600 mb-2 truncate">Owner: ${item.owner} | Status: ${item.status}</p>
+                        <div class="text-xs text-gray-500 flex items-center space-x-2">
+                             <span>Week: ${item.week_id ? weekToLabel(item.week_id) : 'N/A'}</span>
+                             <span>| Category: ${item.week_type}</span>
+                        </div>
+                    </div>
+                    <!-- Actions -->
+                    <div class="no-clutter flex items-center space-x-2 ml-4 flex-shrink-0">
+                        <button class="edit-icon text-gray-500 hover:text-primary transition" title="Edit Item" onclick="window.openModal(false, null, '${item.id}')">
+                            <i data-lucide="square-pen" class="w-5 h-5"></i>
+                        </button>
+                        <button class="edit-icon text-gray-500 hover:text-red-500 transition" title="Delete Item" onclick="window.deleteReleaseItem('${item.id}')">
+                            <i data-lucide="trash-2" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+        };
+
+        const renderReleaseCard = (title, items) => {
+            return `
+                <div class="release-card bg-white p-6 rounded-xl shadow-2xl border-t-4 border-primary">
+                    <h2 class="text-xl font-extrabold text-primary mb-4 border-b pb-2">${title} (${items.length})</h2>
+                    <div class="space-y-4 min-h-[100px]" id="release-list-${title.replace(/\s/g, '-')}">
+                        ${items.length === 0 
+                            ? `<p class="text-gray-500 italic p-4 bg-gray-50 rounded-lg">No ${title.toLowerCase()} items found for the current filters.</p>` 
+                            : items.map(renderReleaseItem).join('')
+                        }
+                    </div>
+                </div>
+            `;
+        };
+
+        const renderDashboard = () => {
+            if (!isAuthReady || !currentWeekId) return;
+
+            // 1. Filter by Pod (if not 'All')
+            const filteredData = currentFilter === 'All'
+                ? dashboardData
+                : dashboardData.filter(item => item.pod === currentFilter);
+
+            // 2. Determine previous and next week IDs dynamically
+            const prevWeekId = getPreviousWeekId(currentWeekId);
+            const nextWeekId = currentWeekId; // Current focus week is treated as the 'Next' or 'Current' release
+
+            // 3. Separate into sections based on week_type and week_id
+            const previousReleases = filteredData.filter(item => 
+                (item.week_type === PREV_WEEK_KEY || item.week_id === prevWeekId) && item.week_type !== BLOCKER_KEY
+            );
+            const nextReleases = filteredData.filter(item => 
+                (item.week_type === NEXT_WEEK_KEY || item.week_id === nextWeekId) && item.week_type !== BLOCKER_KEY
+            );
+            const blockers = filteredData.filter(item => 
+                item.week_type === BLOCKER_KEY
+            );
+            
+            // Sort by priority for better visibility (Critical first)
+            const sortOrder = PRIORITY_OPTIONS;
+            const sortByPriority = (a, b) => sortOrder.indexOf(a.priority) - sortOrder.indexOf(b.priority);
+
+            previousReleasesDiv.innerHTML = renderReleaseCard(`Previous Release Items (${prevWeekId ? weekToLabel(prevWeekId) : 'N/A'})`, previousReleases.sort(sortByPriority));
+            nextReleasesDiv.innerHTML = renderReleaseCard(`Current Release Items (${weekToLabel(nextWeekId)})`, nextReleases.sort(sortByPriority));
+            blockersSectionDiv.innerHTML = renderReleaseCard(`Critical Blockers`, blockers.sort(sortByPriority));
+
+            lucide.createIcons();
+        };
+
+
+        // --- MODAL LOGIC (CRUD Form) ---
+
+        const resetForm = () => {
+            itemForm.reset();
+            document.getElementById('item-id-input').value = '';
+            document.getElementById('modal-title').textContent = 'Add New Release Item';
+            document.getElementById('form-submit-btn').textContent = 'Save Item';
+        };
+
+        window.openModal = (isNew, defaultCategory = null, itemId = null) => {
+            resetForm();
+            
+            // Set default week ID (current focus week)
+            document.getElementById('week-input').value = currentWeekId || getCurrentWeekId();
+            
+            // Set default category for new items
+            const categorySelect = document.getElementById('category-select-form').selectElement;
+            if (isNew && defaultCategory && categorySelect) {
+                 categorySelect.value = defaultCategory;
             }
 
+            if (itemId) {
+                const item = dashboardData.find(d => d.id === itemId);
+                if (item) {
+                    document.getElementById('modal-title').textContent = 'Edit Release Item';
+                    document.getElementById('form-submit-btn').textContent = 'Update Item';
+                    document.getElementById('item-id-input').value = item.id;
+                    document.getElementById('key-input').value = item.key;
+                    document.getElementById('owner-input').value = item.owner;
+                    document.getElementById('summary-input').value = item.summary;
+                    document.getElementById('week-input').value = item.week_id;
+                    
+                    document.getElementById('pod-select-form').selectElement.value = item.pod;
+                    document.getElementById('priority-select-form').selectElement.value = item.priority;
+                    document.getElementById('category-select-form').selectElement.value = item.week_type;
+                    document.getElementById('status-select-form').selectElement.value = item.status;
+                }
+            }
 
             itemModal.classList.remove('hidden');
             setTimeout(() => {
@@ -1182,70 +1065,132 @@
                 modalContent.classList.add('scale-100', 'opacity-100');
             }, 10);
         };
-        
-        const closeModal = () => {
+
+        window.closeModal = () => {
             modalContent.classList.remove('scale-100', 'opacity-100');
             modalContent.classList.add('scale-95', 'opacity-0');
             setTimeout(() => {
                 itemModal.classList.add('hidden');
-                itemForm.reset(); 
+                resetForm();
+            }, 300);
+        };
+        
+        // Custom confirmation modal (to replace confirm() browser calls)
+        const showCustomConfirmation = (title, message) => {
+            return new Promise(resolve => {
+                const modalId = 'confirmation-modal';
+                let modal = document.getElementById(modalId);
+                
+                // If modal doesn't exist, create it once
+                if (!modal) {
+                    modal = document.createElement('div');
+                    modal.id = modalId;
+                    // z-index 60 is higher than other modals (z-50)
+                    modal.className = 'fixed inset-0 bg-gray-600 bg-opacity-75 overflow-y-auto h-full w-full z-[60] flex items-center justify-center hidden';
+                    modal.innerHTML = `
+                        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm mx-4 p-6">
+                            <h3 class="text-xl font-semibold text-gray-900 mb-3 border-b pb-2" id="confirm-title"></h3>
+                            <p class="text-gray-700 mb-6" id="confirm-message"></p>
+                            <div class="flex justify-end space-x-3">
+                                <button id="confirm-cancel" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition duration-150">Cancel</button>
+                                <button id="confirm-ok" class="px-4 py-2 text-sm font-medium text-white main-button rounded-lg transition duration-150">Confirm</button>
+                            </div>
+                        </div>
+                    `;
+                    document.body.appendChild(modal);
+                }
+
+                document.getElementById('confirm-title').textContent = title;
+                document.getElementById('confirm-message').textContent = message;
+                modal.classList.remove('hidden');
+
+                const okBtn = document.getElementById('confirm-ok');
+                const cancelBtn = document.getElementById('confirm-cancel');
+
+                // Listener cleanup and modal hide
+                const cleanUp = () => {
+                    okBtn.removeEventListener('click', onOk);
+                    cancelBtn.removeEventListener('click', onCancel);
+                    modal.classList.add('hidden');
+                };
+
+                const onOk = () => {
+                    cleanUp();
+                    resolve(true);
+                };
+
+                const onCancel = () => {
+                    cleanUp();
+                    resolve(false);
+                };
+
+                okBtn.addEventListener('click', onOk);
+                cancelBtn.addEventListener('click', onCancel);
+            });
+        };
+
+
+        // --- ADMIN SETTINGS MODAL LOGIC ---
+
+        window.openSettingsModal = () => {
+            if (!isAuthReady) return;
+
+            // Load current settings into form textareas
+            podsInput.value = PODS.join('\n');
+            
+            // Filter out the fixed keys before displaying user-editable ones
+            const editableWeekTypes = WEEK_TYPE_OPTIONS.filter(wt => 
+                wt !== NEXT_WEEK_KEY && wt !== PREV_WEEK_KEY && wt !== BLOCKER_KEY
+            );
+            weekTypesInput.value = editableWeekTypes.join('\n');
+            customWeeksInput.value = CUSTOM_WEEKS.join('\n');
+
+            settingsModal.classList.remove('hidden');
+            setTimeout(() => {
+                settingsModalContent.classList.remove('scale-95', 'opacity-0');
+                settingsModalContent.classList.add('scale-100', 'opacity-100');
+            }, 10);
+        };
+
+        window.closeSettingsModal = () => {
+            settingsModalContent.classList.remove('scale-100', 'opacity-100');
+            settingsModalContent.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                settingsModal.classList.add('hidden');
             }, 300);
         };
 
-        // Open Modal handler
-        // newItemBtn.addEventListener('click', () => openModal(true)); 
-        // NOTE: The main button now calls window.openModal(true, 'Next Week') directly in the HTML.
-        closeModalBtn.addEventListener('click', closeModal);
-        formCancelBtn.addEventListener('click', closeModal);
-        
-        // PDF Download Handler
+        // --- EVENT ATTACHMENTS & INITIALIZATION ---
+
+        // Modal event listeners
+        closeModalBtn.addEventListener('click', window.closeModal);
+        formCancelBtn.addEventListener('click', window.closeModal);
+        itemForm.addEventListener('submit', window.saveReleaseItem);
+
+        // Settings event listeners
+        closeSettingsModalBtn.addEventListener('click', window.closeSettingsModal);
+        settingsForm.addEventListener('submit', window.saveSettings);
+
+        // PDF Download Listener
         pdfDownloadBtn.addEventListener('click', () => {
-            // This triggers the browser's native print dialog
-            window.print();
-        });
-
-        // Submit Form Handler (Saves/Updates to Firestore)
-        itemForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const submitButton = document.getElementById('form-submit-btn');
-            submitButton.disabled = true;
-            submitButton.textContent = 'Processing...';
-            
-            const formData = new FormData(e.target);
-            const itemData = {};
-            for (let [key, value] of formData.entries()) {
-                itemData[key] = value;
+            // Use presentation mode to hide controls before printing
+            const originalMode = body.classList.contains('presentation-mode');
+            if (!originalMode) {
+                 window.togglePresentationMode();
             }
-            
-            const itemId = itemData.id;
-            delete itemData.id; 
-            
-            itemData.date = new Date().toISOString().split('T')[0];
-            const releasesRef = collection(db, `/artifacts/${appId}/public/data/${COLLECTION_RELEASES}`);
 
-            try {
-                if (itemId) {
-                    await updateDoc(doc(releasesRef, itemId), { ...itemData, updatedBy: userId });
-                } else {
-                    await addDoc(releasesRef, { ...itemData, createdBy: userId });
+            // A small delay to ensure the DOM repaint before printing
+            setTimeout(() => {
+                window.print();
+                // Restore presentation mode after printing
+                if (!originalMode) {
+                     window.togglePresentationMode();
                 }
-                
-                closeModal();
-            } catch (error) {
-                console.error('Error saving item to Firestore:', error);
-            } finally {
-                submitButton.disabled = false;
-                submitButton.textContent = 'Save Item';
-            }
+            }, 50); 
         });
 
-        // --- Application Initialization ---
-
-        window.onload = () => {
-            authenticateAndInit();
-            lucide.createIcons();
-        };
+        // Start the application
+        initFirebaseAndAuth();
 
     </script>
 </body>
