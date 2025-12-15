@@ -1,0 +1,55 @@
+# This workflow deploys static content to GitHub Pages.
+# It is designed to deploy a single HTML file and its assets
+# (like your POD Notification.html) directly from the repository root.
+
+name: Deploy Static Page to GitHub Pages
+
+on:
+  push:
+    branches: ["main"]
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# Sets the GITHUB_TOKEN permissions required for deployment
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow only one concurrent deployment
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  # The 'build' job prepares the artifact for deployment
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ----------------------------------------------------
+      # IMPORTANT: Upload the entire directory as the artifact
+      # Since your single HTML file is at the root, we upload '.'
+      # ----------------------------------------------------
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          # The entire repository root will be deployed
+          path: '.' 
+
+  # The 'deploy' job takes the artifact and publishes it
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
