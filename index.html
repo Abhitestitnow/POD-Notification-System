@@ -1,1202 +1,999 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>POD Release notification system</title>
-    <!-- Load Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
-    <style>
-        /* Base (Default/Indigo) Theme */
-        :root {
-            --primary-color: #4f46e5; /* Indigo-600 */
-            --primary-bg: #4f46e5;
-            --secondary-bg: #f9fafb; /* Gray-50 */
-            --text-color: #1f2937; /* Gray-900 */
-        }
-        
-        /* Dark Theme */
-        .theme-dark {
-            --primary-color: #10b981; /* Emerald-500 as accent */
-            --primary-bg: #1f2937; /* Gray-800 */
-            --secondary-bg: #374151; /* Gray-700 */
-            --text-color: #f3f4f6; /* Gray-100 */
-        }
-        
-        /* Teal Accent Theme */
-        .theme-teal {
-            --primary-color: #14b8a6; /* Teal-500 */
-            --primary-bg: #14b8a6;
-            --secondary-bg: #f0fdfa; /* Teal-50 */
-            --text-color: #115e59; /* Teal-900; */
-        }
+  <meta charset="UTF-8" />
+  <title>POD Release Notification System — Business Dashboard (Clean + Seamless)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    /* ======================================================================
+       Base variables and reset
+       ====================================================================== */
+    :root {
+      --bg: #ffffff;
+      --text: #0f172a;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --chip: #f8fafc;
+      --chip-active: #e0f2ff;
+      --accent: #2563eb;
+      --accent2: #22c55e;
+      --danger: #ef4444;
+      --warn: #f59e0b;
+      --line-bg: #ffffff;
+      --line-border: #e5e7eb;
+      --shadow: 0 8px 24px rgba(0,0,0,0.06);
+      --sky: #eaf4ff;
+      --sky-border: #dbeafe;
+      --panel: rgba(255,255,255,0.98);
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Arial, "Noto Sans", sans-serif; }
 
-        /* Ocean Blue Theme */
-        .theme-blue {
-            --primary-color: #3b82f6; /* Blue-500 */
-            --primary-bg: #3b82f6;
-            --secondary-bg: #eff6ff; /* Blue-50 */
-            --text-color: #1e3a8a; /* Blue-900 */
-        }
+    /* ======================================================================
+       Header bar
+       ====================================================================== */
+    header { position: sticky; top: 0; z-index: 60; background: #fff; border-bottom: 1px solid var(--border); padding: 12px 20px; }
+    .bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .title { font-weight: 800; font-size: 18px; letter-spacing: 0.2px; }
+    .status { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 6px 10px; background: #fff; }
+    .inline-error { color: #9b1c1c; background: rgba(239,68,68,0.10); border: 1px solid #fecaca; border-radius: 8px; padding: 6px 10px; font-size: 12px; display: none; }
+    #presentationBtn { border: 1px solid var(--border); background: transparent; color: var(--text); padding: 8px 12px; border-radius: 10px; cursor: pointer; font-size: 13px; }
+    #presentationBtn:hover { transform: translateY(-1px); border-color: #cbd5e1; background: #eef2ff; }
 
-        /* Rose Theme */
-        .theme-pink {
-            --primary-color: #ec4899; /* Pink-500 */
-            --primary-bg: #ec4899;
-            --secondary-bg: #fdf2f8; /* Pink-50 */
-            --text-color: #831843; /* Pink-900 */
-        }
+    /* ======================================================================
+       Strips: Pods and Weeks (sky-colored)
+       ====================================================================== */
+    .strip { width: 100%; background: var(--sky); border-top: 1px solid var(--sky-border); border-bottom: 1px solid var(--sky-border); }
+    .container { max-width: 1240px; margin: 0 auto; padding: 8px 20px; }
+    .row { display: flex; gap: 12px; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; padding: 10px 0; scroll-snap-type: x proximity; }
+    .row::-webkit-scrollbar { height: 8px; }
+    .row::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 8px; }
+    .row::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
 
-        /* Forest Green Theme */
-        .theme-emerald {
-            --primary-color: #059669; /* Emerald-600 */
-            --primary-bg: #059669;
-            --secondary-bg: #f0fdfa; /* Emerald-50 */
-            --text-color: #064e3b; /* Emerald-900 */
-        }
+    .chip { display: inline-flex; align-items: center; gap: 10px; padding: 14px 18px; border: 1px solid var(--border); border-radius: 999px; background: var(--chip); cursor: pointer; box-shadow: var(--shadow); transition: transform 0.08s ease, border-color 0.2s ease, background 0.2s ease; flex: 0 0 auto; scroll-snap-align: start; font-size: 14px; font-weight: 700; min-width: 130px; justify-content: center; }
+    .chip:hover { transform: translateY(-1px); border-color: #cbd5e1; }
+    .chip.active { background: var(--chip-active); border-color: #93c5fd; box-shadow: 0 0 0 2px rgba(37,99,235,0.12) inset; }
+    .chip input { border: none; outline: none; background: transparent; color: var(--text); font-weight: 800; font-size: 14px; text-align: center; min-width: 120px; }
+    .edit-icon { font-size: 14px; color: #9ca3af; cursor: pointer; user-select: none; }
+    .edit-icon:hover { color: #374151; }
 
-        body { 
-            font-family: 'Inter', sans-serif; 
-            background-color: var(--secondary-bg);
-            color: var(--text-color);
-            transition: background-color 0.3s, color 0.3s;
-        }
+    /* ======================================================================
+       Content panels (clean, minimal)
+       ====================================================================== */
+    .content { max-width: 1240px; margin: 0 auto; padding: 18px 20px 90px; }
+    .panel { border: 1px solid var(--border); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); padding: 12px; }
+    .panel h2 { margin: 0 0 8px; font-size: 16px; font-weight: 800; display: flex; align-items: center; justify-content: space-between; }
+    .actions { display: flex; gap: 8px; align-items: center; }
 
-        /* Apply theme colors using variables */
-        .header-bg { background-color: var(--primary-bg); }
-        .header-text { color: var(--text-color); }
-        .main-button { background-color: var(--primary-color); }
-        /* Adjusted hover for better contrast calculation */
-        .main-button:hover { background-color: color-mix(in srgb, var(--primary-color) 85%, black); } 
-        .border-primary { border-color: color-mix(in srgb, var(--primary-color) 20%, white); }
-        .text-primary { color: var(--primary-color); }
-        .focus-primary { 
-            border-color: var(--primary-color); 
-            box-shadow: 0 0 0 1px var(--primary-color);
-        }
-        
-        /* Card background in non-dark themes */
-        .bg-white { 
-            background-color: var(--secondary-bg); /* Use secondary background for card/white areas */
-        }
-        .theme-dark .bg-white {
-            background-color: #1f2937; /* Dark mode card bg */
-        }
-        
-        .card-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-        }
-        
-        #week-selector-container::-webkit-scrollbar { height: 6px; }
-        #week-selector-container::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
-        #week-selector-container::-webkit-scrollbar-track { background: #f1f5f9; }
+    .btn { border: 1px solid var(--border); background: #f8fafc; color: var(--text); padding: 8px 12px; border-radius: 10px; cursor: pointer; font-size: 13px; transition: transform 0.08s ease, border-color 0.2s ease, background 0.2s ease; }
+    .btn:hover { transform: translateY(-1px); border-color: #cbd5e1; background: #eef2ff; }
+    .btn.primary { background: var(--accent); color: #fff; border-color: #1d4ed8; }
+    .btn.green { background: var(--accent2); color: #fff; border-color: #15803d; }
+    .btn.red { background: var(--danger); color: #fff; border-color: #b91c1c; }
+    .btn.ghost { background: transparent; }
 
-        /* Presentation Mode Hiding */
-        body.presentation-mode .no-clutter,
-        body.presentation-mode .edit-icon,
-        body.presentation-mode .controls,
-        body.presentation-mode .footer-controls,
-        /* NEW: Hide PDF button in presentation mode */
-        body.presentation-mode #pdf-download-btn,
-        body.presentation-mode #confirmation-modal { 
-            display: none !important;
-        }
-        /* Ensure the main grid takes full width in presentation mode */
-        body.presentation-mode #dashboard-grid {
-             grid-template-columns: 1fr !important;
-        }
+    /* Inline add forms (with pod dropdown + Other) */
+    .inline-form { display: grid; grid-template-columns: 1.2fr 0.9fr 0.9fr 1.4fr auto; gap: 8px; align-items: center; margin: 6px 0 10px; }
+    .inline-form input, .inline-form textarea, .inline-form select { padding: 8px; border: 1px solid var(--border); border-radius: 8px; background: #fff; color: var(--text); font-size: 13px; }
 
-        /* Styling for Print (PDF) Output */
-        @media print {
-            body { background-color: white !important; color: black !important; }
-            .no-print { display: none !important; }
-            .main-content-grid {
-                grid-template-columns: 2fr 1fr; 
-            }
-            header, footer, .controls { border: none !important; }
-            #pdf-download-btn { display: none !important; } /* Hide for actual printing */
-            /* Ensure modal content is hidden in print */
-            #item-modal, #theme-modal, #settings-modal, #confirmation-modal {
-                display: none !important;
-            }
-        }
-    </style>
-    <!-- Lucide icons for professional look (e.g., edit, trash) -->
-    <script src="https://unpkg.com/lucide@latest"></script>
+    /* ======================================================================
+       Minimal list rendering (no boxes; conditional fields)
+       ====================================================================== */
+    .lines { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+    .line { background: var(--line-bg); border: 1px solid var(--line-border); border-radius: 10px; padding: 10px 12px; display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: start; }
+    .line:hover { background: #f9fafb; }
+    .line-left { display: flex; flex-direction: column; gap: 4px; }
+    .line-title-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; }
+    .line-index { font-weight: 800; color: var(--muted); }
+    .line-title { font-weight: 800; }
+    .line-meta { font-size: 12px; color: var(--muted); }
+    .line-actions { display: inline-flex; gap: 6px; align-items: center; }
+    .line-actions .btn { padding: 6px 10px; font-size: 12px; }
+    .empty { font-size: 12px; color: var(--muted); border: 1px dashed var(--border); border-radius: 8px; padding: 8px; background: #fff; text-align: center; }
+
+    /* ======================================================================
+       Body layout: Previous on top; Next same size (left); Blockers right
+       ====================================================================== */
+    .stack { display: flex; flex-direction: column; gap: 16px; }
+    .row-two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 1080px) { .row-two { grid-template-columns: 1fr; } }
+
+    /* ======================================================================
+       Bottom bar: theme gear + save all
+       ====================================================================== */
+    .bar-bottom { position: fixed; left: 16px; right: 16px; bottom: 16px; display: flex; align-items: center; justify-content: space-between; gap: 10px; border: 1px solid var(--border); border-radius: 12px; background: #fff; box-shadow: var(--shadow); padding: 8px 12px; z-index: 70; }
+    .left-controls { display: flex; align-items: center; gap: 10px; }
+    .theme-gear { width: 30px; height: 30px; border: 1px solid var(--border); border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; background: #f8fafc; color: var(--muted); cursor: pointer; user-select: none; }
+    .theme-gear:hover { background: #eef2ff; color: var(--text); }
+    .theme-menu { position: absolute; left: 16px; bottom: 60px; display: none; flex-wrap: wrap; gap: 8px; background: #fff; border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); padding: 10px; z-index: 80; }
+    .theme-dot { width: 22px; height: 22px; border-radius: 6px; border: 1px solid var(--border); cursor: pointer; }
+
+    /* ======================================================================
+       Presentation mode (clean)
+       ====================================================================== */
+    body.presentation { background: #fff; color: #0f172a; }
+    body.presentation .inline-form,
+    body.presentation .line-actions,
+    body.presentation .btn,
+    body.presentation .theme-gear,
+    body.presentation .theme-menu { display: none !important; }
+    body.presentation .panel,
+    body.presentation .line { box-shadow: none; background: #fff; border-color: #e5e7eb; }
+
+    /* ======================================================================
+       Themes (persisted)
+       ====================================================================== */
+    .theme-sky     { --accent:#3b82f6; --accent2:#22c55e; }
+    .theme-ocean   { --accent:#38bdf8; --accent2:#34d399; }
+    .theme-forest  { --accent:#22c55e; --accent2:#65a30d; }
+    .theme-rose    { --accent:#f472b6; --accent2:#fb7185; }
+    .theme-sunset  { --accent:#fb923c; --accent2:#f59e0b; }
+    .theme-violet  { --accent:#8b5cf6; --accent2:#22c55e; }
+    .theme-carbon  { --accent:#111827; --accent2:#22c55e; }
+    .theme-mint    { --accent:#2dd4bf; --accent2:#22c55e; }
+    .theme-gold    { --accent:#f59e0b; --accent2:#22c55e; }
+  </style>
 </head>
-<body class="bg-gray-50">
-
-    <div id="app" class="min-h-screen p-4 sm:p-6 relative">
-        <!-- Presentation Mode Toggle (Top Right) -->
-        <button 
-            id="presentation-toggle-btn" 
-            class="no-clutter absolute top-6 right-6 z-40 p-2 text-primary bg-white rounded-full shadow-lg hover:shadow-xl transition duration-300" 
-            title="Toggle Presentation Mode (Press Esc to exit)"
-            onclick="togglePresentationMode()"
-        >
-            <i data-lucide="monitor" class="w-6 h-6"></i>
-        </button>
-
-        <!-- Header & Customization (Now fixed) -->
-        <header class="mb-6 pb-4 border-b-2 border-primary flex flex-col justify-between items-start transition duration-300">
-            <!-- Fixed Header -->
-            <h1 class="text-3xl font-extrabold text-primary p-1 w-full">
-                POD Release Notification System
-            </h1>
-            
-            <div class="mt-4 w-full flex justify-between items-center text-sm text-gray-600 no-clutter no-print">
-                <div class="flex items-center space-x-2">
-                    <span class="font-medium text-gray-700">Filter by Pod:</span>
-                    <!-- Pod Filter List -->
-                    <div id="pod-filter-list" class="flex flex-wrap space-x-3">
-                        <!-- Pod buttons generated here -->
-                    </div>
-                </div>
-            </div>
-        </header>
-
-        <!-- Timeline / Week Selector -->
-        <div class="controls mb-6 p-4 bg-white rounded-xl shadow-lg no-clutter no-print">
-            <h3 class="text-base font-semibold text-gray-700 mb-3">Release Timeline (Current Focus: <span id="current-week-display" class="font-bold text-primary"></span>)</h3>
-            <div id="week-selector-container" class="flex overflow-x-auto space-x-2 pb-2">
-                <!-- Week buttons generated here -->
-            </div>
-        </div>
-        
-        <!-- Controls & New Item Button (Kept for general "Add New Item") -->
-        <div class="controls flex justify-end items-center mb-6 p-4 bg-white rounded-xl shadow-lg no-clutter no-print">
-            <!-- New Item Button -->
-            <button 
-                id="new-item-btn"
-                class="px-4 py-2 main-button text-white font-semibold rounded-lg shadow-lg transition duration-300 whitespace-nowrap w-full sm:w-auto"
-                onclick="window.openModal(true, 'Next Week')"
-            >
-                + Add General Release Item
-            </button>
-        </div>
-        
-        <!-- Loading Indicator -->
-        <div id="loading-indicator" class="text-center p-8 hidden">
-            <svg class="animate-spin h-8 w-8 text-primary mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <p class="mt-2 text-gray-600">Connecting to database...</p>
-        </div>
-
-
-        <!-- Dashboard Grid (2-Column Layout) -->
-        <div id="dashboard-grid" class="grid grid-cols-1 lg:grid-cols-3 gap-6 auto-rows-fr main-content-grid">
-            
-            <!-- Left Column (Stack Previous and Next Releases) -->
-            <div class="lg:col-span-2 space-y-6">
-                <div id="previous-releases">
-                    <!-- Previous Week Card will be injected here -->
-                </div>
-                <div id="next-releases">
-                    <!-- Next Week Card will be injected here -->
-                </div>
-            </div>
-
-            <!-- Right Column (Blockers) -->
-            <div id="blockers-section" class="lg:col-span-1">
-                <!-- Blockers Card will be injected here -->
-            </div>
-
-        </div>
-
-        <!-- Footer -->
-        <footer class="mt-8 text-sm text-gray-500 pt-4 border-t border-gray-300 flex justify-between items-center">
-            <!-- Control Buttons (Bottom Left) -->
-            <div class="footer-controls flex items-center space-x-4">
-                <!-- Theme Option Button -->
-                <button 
-                    id="theme-toggle-btn" 
-                    class="p-2 text-gray-500 bg-white rounded-full shadow-md hover:bg-gray-100 transition duration-300" 
-                    title="Change Theme"
-                    onclick="window.openThemeModal()"
-                >
-                    <i data-lucide="palette" class="w-5 h-5"></i>
-                </button>
-                
-                <!-- Admin Settings Button -->
-                <button 
-                    id="admin-settings-btn" 
-                    class="p-2 text-gray-500 bg-white rounded-full shadow-md hover:bg-gray-100 transition duration-300" 
-                    title="Admin Settings (Pods, Categories)"
-                    onclick="window.openSettingsModal()"
-                >
-                    <i data-lucide="settings" class="w-5 h-5"></i>
-                </button>
-                <span>Data Source: Firebase Firestore | User: <span id="user-id-display">...</span></span>
-            </div>
-
-            <!-- PDF Download Button (Bottom Right) -->
-            <button id="pdf-download-btn" class="px-3 py-1 bg-gray-200 text-gray-700 font-medium rounded-lg shadow-sm hover:bg-gray-300 transition duration-300 no-print">
-                Download as PDF
-            </button>
-        </footer>
+<body class="theme-sky">
+  <!-- ====================================================================
+       Top bar
+       ==================================================================== -->
+  <header>
+    <div class="bar">
+      <div class="title">POD Release Notification System</div>
+      <div class="status">
+        <span id="authState" class="badge">Auth: …</span>
+        <span id="globalError" class="inline-error"></span>
+        <button id="presentationBtn" title="Presentation mode">Presentation mode</button>
+      </div>
     </div>
+  </header>
 
-    <!-- Modal for adding/editing item -->
-    <div id="item-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-75 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
-        <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 transition-transform duration-300 transform scale-95 opacity-0" id="modal-content">
-            <div class="flex justify-between items-center p-5 border-b bg-primary rounded-t-xl header-bg">
-                <h3 id="modal-title" class="text-2xl font-semibold text-white">Add New Release Item</h3>
-                <button id="close-modal-btn" class="text-white hover:text-gray-200 text-3xl font-light">&times;</button>
-            </div>
-            <form id="item-form" class="p-6 space-y-4">
-                <input type="hidden" id="item-id-input" name="id" value="" />
-                
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label for="key-input" class="block text-sm font-medium text-gray-700">Ticket Key (e.g., PAY-123)</label>
-                        <input type="text" id="key-input" name="key" required
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary p-2 border focus-primary"
-                        />
-                    </div>
-                    <div>
-                        <label for="owner-input" class="block text-sm font-medium text-gray-700">Owner</label>
-                        <input type="text" id="owner-input" name="owner" required
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary p-2 border focus-primary"
-                        />
-                    </div>
-                </div>
-
-                <div>
-                    <label for="summary-input" class="block text-sm font-medium text-gray-700">Summary / Description</label>
-                    <textarea id="summary-input" name="summary" rows="2" required
-                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary p-2 border focus-primary"
-                    ></textarea>
-                </div>
-
-                <div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                    <label-select id="pod-select-form" label="Pod" name="pod"></label-select>
-                    <label-select id="priority-select-form" label="Priority" name="priority"></label-select>
-                    <label-select id="category-select-form" label="Category" name="week_type"></label-select>
-                    <label-select id="status-select-form" label="Status" name="status"></label-select>
-                </div>
-                
-                <div>
-                    <label for="week-input" class="block text-sm font-medium text-gray-700">Target Week (e.g., W52_2025)</label>
-                    <input type="text" id="week-input" name="week_id" required
-                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary p-2 border focus-primary"
-                        title="Format: W[WeekNumber]_[Year], e.g., W52_2025"
-                    />
-                </div>
-
-
-                <div class="pt-4 flex justify-end space-x-3">
-                    <button type="button" id="form-cancel-btn" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition duration-150 shadow-md">
-                        Cancel
-                    </button>
-                    <button type="submit" id="form-submit-btn" class="px-4 py-2 text-sm font-medium text-white main-button rounded-lg transition duration-150 shadow-md">
-                        Save Item
-                    </button>
-                </div>
-            </form>
-        </div>
+  <!-- ====================================================================
+       Pods strip
+       ==================================================================== -->
+  <div class="strip">
+    <div class="container">
+      <div class="row" id="podsRow"></div>
     </div>
-    
-    <!-- Modal for Theme Selection -->
-    <div id="theme-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-75 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
-        <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-sm mx-4 p-6 transition-transform duration-300 transform scale-95 opacity-0" id="theme-modal-content">
-            <h3 class="text-xl font-semibold text-gray-900 mb-4 border-b pb-2">Select Theme</h3>
-            <div id="theme-options" class="grid grid-cols-3 gap-4">
-                <!-- Theme buttons will be rendered here -->
-            </div>
-            <button id="close-theme-modal-btn" class="absolute top-3 right-4 text-gray-500 hover:text-gray-800 text-2xl font-light">&times;</button>
-        </div>
+  </div>
+
+  <!-- ====================================================================
+       Weeks strip
+       ==================================================================== -->
+  <div class="strip">
+    <div class="container">
+      <div class="row" id="weeksRow"></div>
     </div>
+  </div>
 
-    <!-- Admin Settings Modal -->
-    <div id="settings-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-75 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
-        <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-xl mx-4 transition-transform duration-300 transform scale-95 opacity-0" id="settings-modal-content">
-            <div class="flex justify-between items-center p-5 border-b bg-primary rounded-t-xl header-bg">
-                <h3 class="text-2xl font-semibold text-white">Admin Settings</h3>
-                <button id="close-settings-modal-btn" class="text-white hover:text-gray-200 text-3xl font-light">&times;</button>
-            </div>
-            <form id="settings-form" class="p-6 space-y-6">
-                <!-- Pods Editor -->
-                <div>
-                    <label for="pods-input" class="block text-sm font-bold text-gray-700 mb-2">Editable Pod List (One item per line):</label>
-                    <textarea id="pods-input" rows="6" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary p-3 border focus-primary" placeholder="Enter one pod name per line."></textarea>
-                    <p class="text-xs text-gray-500 mt-1">Example: Demand and supply, SLA, Loss reduction...</p>
-                </div>
-                
-                <!-- Week Types Editor -->
-                <div>
-                    <label for="week-types-input" class="block text-sm font-bold text-gray-700 mb-2">Editable Category Options (One item per line):</label>
-                    <textarea id="week-types-input" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary p-3 border focus-primary" placeholder="Enter one category per line."></textarea>
-                    <p class="text-xs text-gray-500 mt-1">These populate the 'Category' dropdown when adding items. Fixed options (Next Week, Previous Week, Blocker) are always included.</p>
-                </div>
-                
-                <!-- Custom Weeks Editor -->
-                <div>
-                    <label for="custom-weeks-input" class="block text-sm font-bold text-gray-700 mb-2">Editable Timeline Weeks (W##_YYYY format, one per line):</label>
-                    <textarea id="custom-weeks-input" rows="6" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary p-3 border focus-primary" placeholder="Example: W52_2025, W01_2026, W02_2026"></textarea>
-                    <p class="text-xs text-gray-500 mt-1">These weeks are displayed in the timeline selector at the top.</p>
-                </div>
-
-                <div class="pt-4 flex justify-end">
-                    <button type="submit" class="px-4 py-2 text-sm font-medium text-white main-button rounded-lg transition duration-150 shadow-md">
-                        Save Settings
-                    </button>
-                </div>
-            </form>
+  <!-- ====================================================================
+       Content: previous on top (full row); next (left) + blockers (right) same size
+       ==================================================================== -->
+  <div class="content">
+    <div class="stack">
+      <!-- Previous release -->
+      <div class="panel">
+        <h2>
+          <span>Previous release</span>
+          <div class="actions">
+            <button class="btn" id="toggleLastForm">+ Add</button>
+          </div>
+        </h2>
+        <div class="inline-form" id="lastForm" style="display:none">
+          <input id="lastTitle" placeholder="Title (e.g., Build SR Onboarding)" />
+          <input id="lastDate" type="date" />
+          <select id="lastPod"></select>
+          <textarea id="lastNotes" placeholder="Comments (optional)"></textarea>
+          <button class="btn green" id="addLast">Save</button>
         </div>
+        <div class="lines" id="lastList"><div class="empty">No previous releases yet.</div></div>
+      </div>
+
+      <!-- Next + Blockers row -->
+      <div class="row-two">
+        <div class="panel">
+          <h2>
+            <span>Next release</span>
+            <div class="actions">
+              <button class="btn" id="toggleUpcomingForm">+ Add</button>
+            </div>
+          </h2>
+          <div class="inline-form" id="upForm" style="display:none">
+            <input id="upTitle" placeholder="Title (e.g., SLA Alerts 2.0)" />
+            <input id="upDate" type="date" />
+            <select id="upPod"></select>
+            <textarea id="upNotes" placeholder="Comments (optional)"></textarea>
+            <button class="btn green" id="addUpcoming">Save</button>
+          </div>
+          <div class="lines" id="upList"><div class="empty">No upcoming releases yet.</div></div>
+        </div>
+
+        <div class="panel">
+          <h2>
+            <span>Blockers</span>
+            <div class="actions">
+              <button class="btn red" id="toggleBlockerForm">+ Add</button>
+            </div>
+          </h2>
+          <div class="inline-form" id="blockForm" style="display:none; grid-template-columns:1.2fr 0.9fr 0.9fr 1.4fr auto">
+            <input id="blockTitle" placeholder="Summary (e.g., API dependency delay)" />
+            <input id="blockOwner" placeholder="Owner / Team (optional)" />
+            <select id="blockPod"></select>
+            <textarea id="blockNotes" placeholder="Details (optional)"></textarea>
+            <button class="btn red" id="addBlocker">Save</button>
+          </div>
+          <div class="lines" id="blockList"><div class="empty">No blockers yet.</div></div>
+        </div>
+      </div>
     </div>
+  </div>
 
+  <!-- ====================================================================
+       Bottom bar: theme gear + central save
+       ==================================================================== -->
+  <div class="bar-bottom">
+    <div class="left-controls">
+      <div id="themeGear" class="theme-gear" title="Theme">⚙</div>
+      <div id="themeMenu" class="theme-menu">
+        <div class="theme-dot" data-theme="theme-sky"    style="background:#0ea5e9" title="Sky"></div>
+        <div class="theme-dot" data-theme="theme-ocean"  style="background:#38bdf8" title="Ocean"></div>
+        <div class="theme-dot" data-theme="theme-forest" style="background:#22c55e" title="Forest"></div>
+        <div class="theme-dot" data-theme="theme-rose"   style="background:#f472b6" title="Rose"></div>
+        <div class="theme-dot" data-theme="theme-sunset" style="background:#fb923c" title="Sunset"></div>
+        <div class="theme-dot" data-theme="theme-violet" style="background:#8b5cf6" title="Violet"></div>
+        <div class="theme-dot" data-theme="theme-carbon" style="background:#111827" title="Carbon"></div>
+        <div class="theme-dot" data-theme="theme-mint"   style="background:#2dd4bf" title="Mint"></div>
+        <div class="theme-dot" data-theme="theme-gold"   style="background:#f59e0b" title="Gold"></div>
+      </div>
+    </div>
+    <div><button id="saveAll" class="btn primary" title="Save all visible edits and pod names">Save all</button></div>
+  </div>
 
-    <script type="module">
-        // --- Firebase SDK Imports ---
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, onSnapshot, addDoc, doc, setDoc, updateDoc, deleteDoc, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+  <!-- ====================================================================
+       Scripts: Firebase + App
+       ==================================================================== -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    import {
+      getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc,
+      collection, addDoc, query, where, onSnapshot, serverTimestamp
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-        // IMPORTANT: Enable debug logging for Firestore
-        setLogLevel('Debug');
+    /* ---------------------------------------------------------
+       Firebase config
+       --------------------------------------------------------- */
+    const firebaseConfig = {
+      apiKey: "AIzaSyBZd-UtIKqRfe_rcCH02XZuYmPnCTMDRDY",
+      authDomain: "notification-system-pod.firebaseapp.com",
+      projectId: "notification-system-pod",
+      storageBucket: "notification-system-pod.firebasestorage.app",
+      messagingSenderId: "975892643280",
+      appId: "1:975892643280:web:fb0898d60c37e4a749cdd5",
+      measurementId: "G-JZSPSEVCN1"
+    };
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    let db = null;
 
-        // --- Global Configuration (Using environment variables) ---
-        // These variables are injected by the Canvas environment, ensuring secure access to your project.
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id'; 
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+    /* ---------------------------------------------------------
+       DOM helpers
+       --------------------------------------------------------- */
+    const el = id => document.getElementById(id);
+    const podsRow = el("podsRow");
+    const weeksRow = el("weeksRow");
+    const authStateEl = el("authState");
+    const globalError = el("globalError");
+    const lastForm = el("lastForm"), upForm = el("upForm"), blockForm = el("blockForm");
+    const lastList = el("lastList"), upList = el("upList"), blockList = el("blockList");
+    const themeGear = el("themeGear"), themeMenu = el("themeMenu");
+    const lastPodSel = el("lastPod"), upPodSel = el("upPod"), blockPodSel = el("blockPod");
 
-        let db;
-        let auth;
-        let userId = 'anonymous'; 
-        let dashboardData = []; 
-        let currentFilter = 'All'; 
-        let currentWeekId = ''; 
-        let currentTheme = 'default';
-        let isAuthReady = false;
+    /* ---------------------------------------------------------
+       State
+       --------------------------------------------------------- */
+    // Pods include ALL and OTHERS; OTHERS only shows under ALL and "Others" filter, not as a renameable regular pod
+    let pods = ["ALL","D&S","SLA","LOSS","CX","HYC","Others"];
+    let activePod = "ALL";
+    let activeWeekKey = "", activeWeekLabel = "", previousWeekKey = "";
+    let unsubLast = null, unsubUpcoming = null, unsubBlockers = null;
 
-        // --- Application Constants (Now loaded from Firestore) ---
-        let PODS = ['Demand and supply', 'SLA', 'Loss reduction', 'Customer Experience', 'High yield client'];
-        const PRIORITY_OPTIONS = ['Critical', 'High', 'Medium', 'Low'];
-        const STATUS_OPTIONS = ['Planned', 'In Progress', 'Released', 'Blocked'];
-        // Fixed keys for UI sections - MUST NOT be changed even if custom options are changed
-        const NEXT_WEEK_KEY = 'Next Week'; 
-        const PREV_WEEK_KEY = 'Previous Week'; 
-        const BLOCKER_KEY = 'Blocker'; 
-        let WEEK_TYPE_OPTIONS = [NEXT_WEEK_KEY, PREV_WEEK_KEY, BLOCKER_KEY]; // Default options for the form
-        let CUSTOM_WEEKS = []; 
-        
-        // --- Firestore Collection Paths (Public data) ---
-        // Path: /artifacts/{appId}/public/data/releases
-        const COLLECTION_RELEASES = 'releases'; 
-        // Path: /artifacts/{appId}/public/data/settings
-        const COLLECTION_SETTINGS = 'settings'; 
-        const SETTINGS_DOC_ID = 'app_config';
-        
-        const THEMES = [
-            { id: 'default', name: 'Indigo', class: '', primary: '#4f46e5' }, 
-            { id: 'dark', name: 'Dark Mode', class: 'theme-dark', primary: '#1f2937' }, 
-            { id: 'teal', name: 'Teal Accent', class: 'theme-teal', primary: '#14b8a6' }, 
-            { id: 'blue', name: 'Ocean Blue', class: 'theme-blue', primary: '#3b82f6' }, 
-            { id: 'pink', name: 'Rose', class: 'theme-pink', primary: '#ec4899' }, 
-            { id: 'emerald', name: 'Forest Green', class: 'theme-emerald', primary: '#059669' }, 
-        ];
+    /* ---------------------------------------------------------
+       Error helpers
+       --------------------------------------------------------- */
+    function showError(msg) { globalError.textContent = msg; globalError.style.display = "inline-block"; }
+    function clearError() { globalError.textContent = ""; globalError.style.display = "none"; }
 
+    /* ---------------------------------------------------------
+       Meta doc for pods
+       --------------------------------------------------------- */
+    const podsDoc = () => doc(db, "dashboard_meta", "pods");
 
-        // --- DOM Elements ---
-        const body = document.body;
-        const userIdDisplay = document.getElementById('user-id-display');
-        const podFilterList = document.getElementById('pod-filter-list');
-        const weekSelectorContainer = document.getElementById('week-selector-container');
-        const currentWeekDisplay = document.getElementById('current-week-display');
-        const newItemBtn = document.getElementById('new-item-btn');
-        const itemModal = document.getElementById('item-modal');
-        const modalContent = document.getElementById('modal-content');
-        const closeModalBtn = document.getElementById('close-modal-btn');
-        const formCancelBtn = document.getElementById('form-cancel-btn');
-        const itemForm = document.getElementById('item-form');
-        const loadingIndicator = document.getElementById('loading-indicator');
-        const previousReleasesDiv = document.getElementById('previous-releases');
-        const nextReleasesDiv = document.getElementById('next-releases');
-        const blockersSectionDiv = document.getElementById('blockers-section');
-        const themeModal = document.getElementById('theme-modal');
-        const themeModalContent = document.getElementById('theme-modal-content');
-        const closeThemeModalBtn = document.getElementById('close-theme-modal-btn');
-        const themeOptionsDiv = document.getElementById('theme-options');
-        const pdfDownloadBtn = document.getElementById('pdf-download-btn');
-        
-        // Admin Settings Elements
-        const settingsModal = document.getElementById('settings-modal');
-        const settingsModalContent = document.getElementById('settings-modal-content');
-        const closeSettingsModalBtn = document.getElementById('close-settings-modal-btn');
-        const settingsForm = document.getElementById('settings-form');
-        const podsInput = document.getElementById('pods-input');
-        const weekTypesInput = document.getElementById('week-types-input');
-        const customWeeksInput = document.getElementById('custom-weeks-input'); 
-
-
-        // --- Custom Component for Select Inputs ---
-
-        class LabelSelect extends HTMLElement {
-            constructor() {
-                super();
-                this.innerHTML = `
-                    <div>
-                        <label for="${this.id}" class="block text-sm font-medium text-gray-700">${this.getAttribute('label')}</label>
-                        <select id="${this.id}-select" name="${this.getAttribute('name')}" 
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary p-2 border focus-primary"
-                        ></select>
-                    </div>
-                `;
-            }
-            // Ensure the select element ID is correct for use in forms
-            get selectElement() {
-                return this.querySelector('select');
-            }
+    async function loadPodsFromDb() {
+      try {
+        const snap = await getDoc(podsDoc());
+        if (snap.exists()) {
+          const p = snap.data().pods;
+          if (Array.isArray(p) && p.length >= 7 && p[0] === "ALL" && p[p.length-1] === "Others") {
+            pods = p;
+            if (!pods.includes(activePod)) activePod = "ALL";
+          }
         }
-        customElements.define('label-select', LabelSelect);
+      } catch (e) {
+        showError("Failed to load pods. " + e.message);
+      }
+    }
+    async function savePodsToDb() {
+      try {
+        await setDoc(podsDoc(), { pods, updatedAt: serverTimestamp() }, { merge: true });
+      } catch (e) {
+        showError("Failed to save pod names. " + e.message);
+      }
+    }
 
-        // --- Utility Functions ---
+    /* ---------------------------------------------------------
+       Week helpers
+       --------------------------------------------------------- */
+    function weekInfo(date = new Date()) {
+      const d = new Date(date.getTime());
+      const dayNum = (d.getDay() + 6) % 7; d.setDate(d.getDate() - dayNum + 3);
+      const firstThursday = new Date(d.getFullYear(), 0, 4);
+      const firstDayNum = (firstThursday.getDay() + 6) % 7;
+      firstThursday.setDate(firstThursday.getDate() - firstDayNum + 3);
+      const isoWeek = 1 + Math.round((d.getTime() - firstThursday.getTime()) / 604800000);
 
-        const getPriorityColor = (priority) => {
-            switch (priority) {
-                case 'Critical': return 'bg-red-600';
-                case 'High': return 'bg-orange-500';
-                case 'Medium': return 'bg-yellow-500';
-                case 'Low': return 'bg-green-500';
-                default: return 'bg-gray-400';
-            }
-        };
+      const now = new Date(date);
+      const year = d.getFullYear();
+      const month = now.getMonth();
+      const firstOfMonth = new Date(year, month, 1);
+      const shift = (firstOfMonth.getDay() + 6) % 7;
+      const weekOfMonth = Math.floor((now.getDate() + shift - 1) / 7) + 1;
+      const quarter = Math.floor(month / 3) + 1;
+      const label = `Week ${weekOfMonth} - Q${quarter} - ${year}`;
 
-        const createPriorityBadge = (priority) => `
-            <span class="inline-flex items-center px-3 py-0.5 rounded-full text-xs font-medium text-white ${getPriorityColor(priority)}">
-                ${priority}
-            </span>
-        `;
-        
-        const populateSelect = (id, options) => {
-            const selectElement = document.getElementById(id)?.selectElement;
-            if (!selectElement) return;
-            selectElement.innerHTML = '';
-            options.forEach(optionText => {
-                const option = document.createElement('option');
-                option.value = optionText;
-                option.textContent = optionText;
-                selectElement.appendChild(option);
-            });
-            // Select the first option if none is selected
-            if (options.length > 0 && selectElement.value === "") {
-                selectElement.value = options[0];
-            }
-        };
+      const monday = new Date(now.getTime());
+      monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+      const prevMon = new Date(monday.getTime());
+      prevMon.setDate(prevMon.getDate() - 7);
+      const prevKey = weekInfoPlain(prevMon);
 
-        const weekToLabel = (weekId) => {
-            if (!weekId || !weekId.startsWith('W')) return 'N/A';
-            const [w, y] = weekId.slice(1).split('_');
-            const weekNumber = parseInt(w, 10);
-            const year = y.slice(2);
-            
-            let quarterLabel = '';
-            if (weekNumber >= 40) quarterLabel = 'Q4';
-            else if (weekNumber >= 26) quarterLabel = 'Q3';
-            else if (weekNumber >= 13) quarterLabel = 'Q2';
-            else quarterLabel = 'Q1';
+      return { key: `${year}-W${String(isoWeek).padStart(2, "0")}`, label, prevKey };
+    }
+    function weekInfoPlain(date) {
+      const d = new Date(date.getTime());
+      const dayNum = (d.getDay() + 6) % 7; d.setDate(d.getDate() - dayNum + 3);
+      const firstThursday = new Date(d.getFullYear(), 0, 4);
+      const firstDayNum = (firstThursday.getDay() + 6) % 7;
+      firstThursday.setDate(firstThursday.getDate() - firstDayNum + 3);
+      const isoWeek = 1 + Math.round((d.getTime() - firstThursday.getTime()) / 604800000);
+      return `${d.getFullYear()}-W${String(isoWeek).padStart(2, "0")}`;
+    }
 
-            return `W${w} (${quarterLabel}'${year})`;
-        };
-        
-        /**
-         * Calculates the week ID immediately preceding the given week ID (Wxx_YYYY).
-         */
-        const getPreviousWeekId = (currentWeekId) => {
-            if (!currentWeekId || !currentWeekId.startsWith('W')) return null;
-
-            const [wStr, yStr] = currentWeekId.slice(1).split('_');
-            let week = parseInt(wStr, 10);
-            let year = parseInt(yStr, 10);
-
-            if (week === 1) {
-                week = 52;
-                year -= 1;
-            } else {
-                week -= 1;
-            }
-            
-            // Re-format to W##_YYYY
-            return `W${String(week).padStart(2, '0')}_${year}`;
-        };
-
-
-        const getCurrentWeekId = () => {
-            // Calculate a plausible current week ID (e.g., W52_2026) for consistent demo purposes
-            const now = new Date();
-            const year = now.getFullYear();
-            // Simple approximation: Week number is (Day of Year / 7)
-            const onejan = new Date(year, 0, 1);
-            const weekNum = Math.ceil((((now - onejan) / 86400000) + onejan.getDay() + 1) / 7);
-            const formattedWeekNum = String(weekNum).padStart(2, '0');
-            return `W${formattedWeekNum}_${year}`;
-        };
-
-        const getCustomWeeksDefault = () => {
-            const current = getCurrentWeekId();
-            const [w, y] = current.slice(1).split('_').map(Number);
-            const defaultWeeks = [];
-            
-            // Generate previous 2 weeks and next 3 weeks
-            for (let i = -2; i <= 3; i++) {
-                let targetWeek = w + i;
-                let targetYear = y;
-
-                // Simple wrap-around logic (not perfectly ISO week calendar accurate, but functional)
-                if (targetWeek <= 0) {
-                    targetWeek += 52;
-                    targetYear -= 1;
-                } else if (targetWeek > 52) {
-                    targetWeek -= 52;
-                    targetYear += 1;
-                }
-
-                if (targetYear >= y - 1 && targetYear <= y + 1) { // Limit range
-                    defaultWeeks.push(`W${String(targetWeek).padStart(2, '0')}_${targetYear}`);
-                }
-            }
-            // Sort them to ensure correct order
-            defaultWeeks.sort((a, b) => {
-                const [wA, yA] = a.slice(1).split('_').map(Number);
-                const [wB, yB] = b.slice(1).split('_').map(Number);
-                if (yA !== yB) return yA - yB;
-                return wA - wB;
-            });
-            return [...new Set(defaultWeeks)]; // Ensure uniqueness
-        }
-        
-        // --- THEME LOGIC ---
-        
-        // Expose to window for inline HTML access
-        window.changeTheme = async (themeId) => {
-            const theme = THEMES.find(t => t.id === themeId);
-            if (!theme) return;
-
-            // 1. Update global state
-            currentTheme = theme.id;
-            
-            // 2. Apply CSS class to body
-            body.className = body.className.split(' ').filter(c => !c.startsWith('theme-') && c !== 'bg-gray-50').join(' ');
-            if (theme.class) {
-                body.classList.add(theme.class);
-            } else {
-                body.classList.add('bg-gray-50'); 
-            }
-            
-            // 3. Persist to Firestore (if DB is ready)
-            try {
-                if (db && isAuthReady) {
-                    // Use setDoc with merge true to update only the theme field
-                    await setDoc(settingsRef(), { theme: themeId, updatedBy: userId, updatedTimestamp: new Date().toISOString() }, { merge: true });
-                }
-            } catch (error) {
-                console.error('Error persisting theme:', error);
-            }
-            
-            renderPodFilters(); 
-            lucide.createIcons();
-        };
-
-        window.openThemeModal = () => { // Expose to window for inline HTML access
-            renderThemeOptions();
-            themeModal.classList.remove('hidden');
-            setTimeout(() => {
-                themeModalContent.classList.remove('scale-95', 'opacity-0');
-                themeModalContent.classList.add('scale-100', 'opacity-100');
-            }, 10);
-        };
-
-        window.closeThemeModal = () => { // Expose to window for inline HTML access
-            themeModalContent.classList.remove('scale-100', 'opacity-100');
-            themeModalContent.classList.add('scale-95', 'opacity-0');
-            setTimeout(() => {
-                themeModal.classList.add('hidden');
-            }, 300);
-        };
-
-        const renderThemeOptions = () => {
-            themeOptionsDiv.innerHTML = THEMES.map(theme => {
-                const isActive = theme.id === currentTheme;
-                // Use a dynamic contrast color for the text inside the button preview
-                const textColor = theme.id === 'dark' || theme.id === 'default' ? 'text-white' : 'text-gray-800'; 
-                
-                return `
-                    <button 
-                        class="theme-option p-3 rounded-lg shadow-md border-2 transition duration-200 flex flex-col items-center hover:shadow-lg ${isActive ? 'border-primary ring-2 ring-primary' : 'border-gray-200'}"
-                        style="background-color: ${theme.primary};"
-                        onclick="window.changeTheme('${theme.id}'); window.closeThemeModal();"
-                    >
-                        <i data-lucide="droplet" class="w-6 h-6 ${textColor} mb-1"></i>
-                        <span class="text-xs font-semibold ${textColor}">${theme.name.split(' ')[0]}</span>
-                    </button>
-                `;
-            }).join('');
-            lucide.createIcons();
-        };
-
-        closeThemeModalBtn.addEventListener('click', window.closeThemeModal);
-        
-        // --- PRESENTATION MODE LOGIC ---
-        
-        window.togglePresentationMode = () => {
-            body.classList.toggle('presentation-mode');
-            
-            const toggleButton = document.getElementById('presentation-toggle-btn');
-            const icon = toggleButton ? toggleButton.querySelector('i') : null;
-            
-            if (icon) {
-                if (body.classList.contains('presentation-mode')) {
-                    icon.setAttribute('data-lucide', 'monitor-off');
-                } else {
-                    icon.setAttribute('data-lucide', 'monitor');
-                }
-                lucide.createIcons();
-            } else {
-                console.warn('Presentation toggle icon not found after toggling mode.');
-            }
-            
-            renderPodFilters(); 
-        };
-
-        // Event Listener for ESC key to exit presentation mode and close modals
-        document.addEventListener('keydown', (event) => {
-            if (event.key === 'Escape') {
-                if (body.classList.contains('presentation-mode')) {
-                    window.togglePresentationMode();
-                }
-                if (!itemModal.classList.contains('hidden')) window.closeModal();
-                if (!themeModal.classList.contains('hidden')) window.closeThemeModal();
-                if (!settingsModal.classList.contains('hidden')) window.closeSettingsModal();
-            }
+    /* ---------------------------------------------------------
+       Populate pod dropdowns (exclude ALL; include Others)
+       --------------------------------------------------------- */
+    function populatePodDropdowns() {
+      const options = pods.filter(p => p !== "ALL");
+      function fill(selectEl) {
+        selectEl.innerHTML = "";
+        options.forEach(p => {
+          const opt = document.createElement("option");
+          opt.value = p; opt.textContent = p; selectEl.appendChild(opt);
         });
-        
-        // --- FIREBASE INITIALIZATION & AUTHENTICATION ---
-        
-        const initFirebaseAndAuth = async () => {
-            loadingIndicator.classList.remove('hidden');
-            
-            try {
-                const app = initializeApp(firebaseConfig);
-                db = getFirestore(app);
-                auth = getAuth(app);
-                
-                // Sign in with custom token if available, otherwise anonymously
-                if (initialAuthToken) {
-                    await signInWithCustomToken(auth, initialAuthToken);
-                } else {
-                    await signInAnonymously(auth);
-                }
-                
-                userId = auth.currentUser?.uid || crypto.randomUUID();
-                userIdDisplay.textContent = userId;
-                isAuthReady = true;
+        // Default to active pod if not ALL, else "Others"
+        if (activePod !== "ALL" && options.includes(activePod)) selectEl.value = activePod;
+        else if (options.includes("Others")) selectEl.value = "Others";
+        else if (options.length) selectEl.value = options[0];
+      }
+      fill(lastPodSel); fill(upPodSel); fill(blockPodSel);
+    }
 
-                // Start listeners
-                loadSettings();
-                listenForReleases();
+    /* ---------------------------------------------------------
+       Minimal list item builders (conditional display)
+       --------------------------------------------------------- */
+    function lineItem(index, id, data, colName) {
+      const li = document.createElement("div");
+      li.className = "line";
+      li.dataset.id = id;
+      li.dataset.col = colName;
 
-            } catch (error) {
-                console.error("Firebase/Auth initialization failed:", error);
-                userIdDisplay.textContent = 'ERROR (Check Console)';
-            } finally {
-                loadingIndicator.classList.add('hidden');
-            }
+      const left = document.createElement("div");
+      left.className = "line-left";
+
+      // Title row: "1/ Title (pod)" — omit (pod) if pod missing
+      const titleRow = document.createElement("div");
+      titleRow.className = "line-title-row";
+      const idx = document.createElement("span");
+      idx.className = "line-index";
+      idx.textContent = `${index}/`;
+      const title = document.createElement("span");
+      title.className = "line-title";
+      title.contentEditable = "true";
+      title.textContent = data.title || "";
+      titleRow.appendChild(idx);
+      titleRow.appendChild(title);
+      if (data.pod) {
+        const podLabel = document.createElement("span");
+        podLabel.className = "line-meta";
+        podLabel.textContent = `(${data.pod})`;
+        titleRow.appendChild(podLabel);
+      }
+      left.appendChild(titleRow);
+
+      // Date row — only if date present
+      if (data.date) {
+        const dateRow = document.createElement("div");
+        const dateLabel = document.createElement("span");
+        dateLabel.className = "line-meta";
+        dateLabel.textContent = "Release date:";
+        const dateVal = document.createElement("input");
+        dateVal.type = "date";
+        dateVal.value = data.date || "";
+        dateVal.style.border = "1px solid var(--border)";
+        dateVal.style.borderRadius = "6px";
+        dateVal.style.padding = "4px 6px";
+        dateVal.style.fontSize = "12px";
+        dateRow.appendChild(dateLabel);
+        dateRow.appendChild(dateVal);
+        left.appendChild(dateRow);
+      }
+
+      // Notes row — only if notes present
+      if (data.notes) {
+        const notesRow = document.createElement("div");
+        const notesLabel = document.createElement("span");
+        notesLabel.className = "line-meta";
+        notesLabel.textContent = "Comment:";
+        const notesVal = document.createElement("textarea");
+        notesVal.value = data.notes || "";
+        notesVal.style.border = "1px solid var(--border)";
+        notesVal.style.borderRadius = "6px";
+        notesVal.style.padding = "6px";
+        notesVal.style.fontSize = "12px";
+        notesVal.style.minHeight = "46px";
+        notesVal.style.width = "100%";
+        notesRow.appendChild(notesLabel);
+        notesRow.appendChild(notesVal);
+        left.appendChild(notesRow);
+      }
+
+      const right = document.createElement("div");
+      right.className = "line-actions";
+      const save = document.createElement("button");
+      save.className = "btn";
+      save.textContent = "Save";
+      const del = document.createElement("button");
+      del.className = "btn red";
+      del.textContent = "Delete";
+      right.appendChild(save);
+      right.appendChild(del);
+
+      li.appendChild(left);
+      li.appendChild(right);
+
+      save.onclick = async () => {
+        if (!db) { showError("Auth failed. Enable Anonymous sign-in and add your domain."); return; }
+        // Collect editable fields if they exist
+        const payload = { updatedAt: serverTimestamp() };
+        payload.title = title.textContent.trim();
+        const dateEl = li.querySelector('input[type="date"]');
+        if (dateEl) payload.date = dateEl.value || null;
+        const notesEl = li.querySelector('textarea');
+        if (notesEl) payload.notes = notesEl.value.trim() || null;
+        try { await updateDoc(doc(db, colName, id), payload); }
+        catch(e){ showError("Save failed. " + e.message); }
+      };
+      del.onclick = async () => {
+        if (!db) { showError("Auth failed. Enable Anonymous sign-in and add your domain."); return; }
+        try { await deleteDoc(doc(db, colName, id)); }
+        catch(e){ showError("Delete failed. " + e.message); }
+      };
+
+      return li;
+    }
+
+    function blockerLineItem(index, id, data, colName) {
+      const li = document.createElement("div");
+      li.className = "line";
+      li.dataset.id = id;
+      li.dataset.col = colName;
+
+      const left = document.createElement("div");
+      left.className = "line-left";
+
+      const titleRow = document.createElement("div");
+      titleRow.className = "line-title-row";
+      const idx = document.createElement("span");
+      idx.className = "line-index";
+      idx.textContent = `${index}/`;
+      const title = document.createElement("span");
+      title.className = "line-title";
+      title.contentEditable = "true";
+      title.textContent = data.title || "";
+      titleRow.appendChild(idx);
+      titleRow.appendChild(title);
+      // Conditional owner and pod
+      const metaParts = [];
+      if (data.owner) metaParts.push(`Owner: ${data.owner}`);
+      if (data.pod) metaParts.push(`Pod: ${data.pod}`);
+      if (metaParts.length) {
+        const ownerPod = document.createElement("span");
+        ownerPod.className = "line-meta";
+        ownerPod.textContent = `(${metaParts.join(", ")})`;
+        titleRow.appendChild(ownerPod);
+      }
+      left.appendChild(titleRow);
+
+      // Severity if present
+      if (data.severity) {
+        const sevRow = document.createElement("div");
+        const sevLabel = document.createElement("span");
+        sevLabel.className = "line-meta";
+        sevLabel.textContent = "Severity:";
+        const sevVal = document.createElement("input");
+        sevVal.value = data.severity || "Medium";
+        sevVal.style.border = "1px solid var(--border)";
+        sevVal.style.borderRadius = "6px";
+        sevVal.style.padding = "4px 6px";
+        sevVal.style.fontSize = "12px";
+        sevRow.appendChild(sevLabel);
+        sevRow.appendChild(sevVal);
+        left.appendChild(sevRow);
+      }
+
+      // Notes if present
+      if (data.notes) {
+        const notesRow = document.createElement("div");
+        const notesLabel = document.createElement("span");
+        notesLabel.className = "line-meta";
+        notesLabel.textContent = "Details:";
+        const notesVal = document.createElement("textarea");
+        notesVal.value = data.notes || "";
+        notesVal.style.border = "1px solid var(--border)";
+        notesVal.style.borderRadius = "6px";
+        notesVal.style.padding = "6px";
+        notesVal.style.fontSize = "12px";
+        notesVal.style.minHeight = "46px";
+        notesVal.style.width = "100%";
+        notesRow.appendChild(notesLabel);
+        notesRow.appendChild(notesVal);
+        left.appendChild(notesRow);
+      }
+
+      const right = document.createElement("div");
+      right.className = "line-actions";
+      const save = document.createElement("button");
+      save.className = "btn";
+      save.textContent = "Save";
+      const del = document.createElement("button");
+      del.className = "btn red";
+      del.textContent = "Delete";
+      right.appendChild(save);
+      right.appendChild(del);
+
+      li.appendChild(left);
+      li.appendChild(right);
+
+      save.onclick = async () => {
+        if (!db) { showError("Auth failed. Enable Anonymous sign-in and add your domain."); return; }
+        const payload = { updatedAt: serverTimestamp() };
+        payload.title = title.textContent.trim();
+        const sevEl = li.querySelector('input:not([type="date"])');
+        if (sevEl) payload.severity = sevEl.value.trim() || null;
+        const notesEl = li.querySelector('textarea');
+        if (notesEl) payload.notes = notesEl.value.trim() || null;
+        try { await updateDoc(doc(db, colName, id), payload); }
+        catch(e){ showError("Save failed. " + e.message); }
+      };
+      del.onclick = async () => {
+        if (!db) { showError("Auth failed. Enable Anonymous sign-in and add your domain."); return; }
+        try { await deleteDoc(doc(db, colName, id)); }
+        catch(e){ showError("Delete failed. " + e.message); }
+      };
+
+      return li;
+    }
+
+    /* ---------------------------------------------------------
+       Optimistic rendering helper
+       --------------------------------------------------------- */
+    function optimisticPrepend(listEl, builder, tempId, payload, colName) {
+      const currentCount = Array.from(listEl.children).filter(c => c.classList.contains("line")).length;
+      const node = builder(currentCount + 1, tempId, payload, colName);
+      node.style.opacity = "0.75";
+      node.style.outline = "1px dashed var(--border)";
+      listEl.querySelector(".empty")?.remove();
+      listEl.prepend(node);
+      return node;
+    }
+
+    /* ---------------------------------------------------------
+       Pods line (chips, inline rename)
+       - Keep "ALL" at start and "Others" at end (non-renamable)
+       --------------------------------------------------------- */
+    function renderPodsLine() {
+      podsRow.innerHTML = "";
+      pods.forEach((p, i) => {
+        const chip = document.createElement("div");
+        chip.className = "chip" + (p === activePod ? " active" : "");
+        chip.title = p;
+        const label = document.createElement("span"); label.textContent = p;
+        chip.appendChild(label);
+
+        chip.onclick = () => {
+          activePod = p;
+          renderPodsLine();
+          rebindRealtime();
+          populatePodDropdowns();
         };
 
-        // --- FIREBASE REFERENCES ---
-        // Public settings reference: /artifacts/{appId}/public/data/settings/app_config
-        const settingsRef = () => doc(db, 'artifacts', appId, 'public', 'data', COLLECTION_SETTINGS, SETTINGS_DOC_ID);
-        // Public releases collection reference: /artifacts/{appId}/public/data/releases
-        const releasesCollection = () => collection(db, 'artifacts', appId, 'public', 'data', COLLECTION_RELEASES);
-        const releaseDocRef = (id) => doc(db, 'artifacts', appId, 'public', 'data', COLLECTION_RELEASES, id);
-
-
-        // --- SETTINGS MANAGEMENT (Admin Configuration) ---
-        
-        const loadSettings = async () => {
-            if (!isAuthReady || !db) return;
-
-            try {
-                // Real-time listener for app settings
-                onSnapshot(settingsRef(), (docSnapshot) => {
-                    const settings = docSnapshot.data() || {};
-                    
-                    // 1. Update Pods
-                    PODS = settings.pods && Array.isArray(settings.pods) && settings.pods.length > 0
-                        ? settings.pods
-                        : ['Demand and supply', 'SLA', 'Loss reduction', 'Customer Experience', 'High yield client'];
-                    
-                    // 2. Update Week Types (Categories for form)
-                    WEEK_TYPE_OPTIONS = [NEXT_WEEK_KEY, PREV_WEEK_KEY, BLOCKER_KEY]; // Reset fixed keys
-                    if (settings.weekTypes && Array.isArray(settings.weekTypes) && settings.weekTypes.length > 0) {
-                        settings.weekTypes.forEach(wt => {
-                            if (!WEEK_TYPE_OPTIONS.includes(wt)) {
-                                WEEK_TYPE_OPTIONS.push(wt);
-                            }
-                        });
-                    }
-
-                    // 3. Update Custom Weeks (Timeline selector)
-                    CUSTOM_WEEKS = settings.customWeeks && Array.isArray(settings.customWeeks) && settings.customWeeks.length > 0
-                        ? settings.customWeeks
-                        : getCustomWeeksDefault();
-                    
-                    // 4. Update Theme
-                    const loadedTheme = settings.theme || 'default';
-                    if (loadedTheme !== currentTheme) {
-                        window.changeTheme(loadedTheme); // Apply theme (and handle persistence update prevention within changeTheme)
-                    } else {
-                        // Re-render UI based on new settings (Pod filters might need updating regardless)
-                        renderFormSelects();
-                        renderPodFilters();
-                        renderWeekSelector();
-                    }
-
-                }, (error) => {
-                    console.error("Error listening to settings:", error);
-                });
-            } catch (error) {
-                console.error("Error setting up settings listener:", error);
-            }
+        // Inline rename: allowed for middle pods only (not ALL, not Others)
+        chip.ondblclick = () => {
+          if (i === 0 || p === "Others") { alert(`${p} cannot be renamed.`); return; }
+          const input = document.createElement("input");
+          input.value = p;
+          chip.innerHTML = "";
+          chip.appendChild(input);
+          input.focus();
+          input.onblur = () => {
+            const newName = input.value.trim();
+            chip.innerHTML = "";
+            chip.appendChild(label);
+            if (!newName) return;
+            pods[i] = newName;
+            label.textContent = newName;
+            populatePodDropdowns();
+          };
+          input.onkeydown = (e) => {
+            if (e.key === "Enter") input.blur();
+            if (e.key === "Escape") { chip.innerHTML = ""; chip.appendChild(label); }
+          };
         };
 
-        // Function to save admin settings (Pods, Week Types, Custom Weeks)
-        window.saveSettings = async (event) => {
-            event.preventDefault();
-            
-            if (!isAuthReady || !db) {
-                console.error("Database not ready. Cannot save settings.");
-                return;
-            }
+        podsRow.appendChild(chip);
+      });
 
-            // Parse text area inputs
-            const newPods = podsInput.value.split('\n').map(s => s.trim()).filter(s => s.length > 0);
-            const newWeekTypes = weekTypesInput.value.split('\n').map(s => s.trim()).filter(s => s.length > 0);
-            
-            // Filter custom weeks for correct format: W##_YYYY
-            const newCustomWeeks = customWeeksInput.value.split('\n').map(s => s.trim()).filter(s => s.length > 0 && s.match(/^W\d{2}_\d{4}$/));
+      const editChip = document.createElement("div");
+      editChip.className = "chip";
+      editChip.innerHTML = `<span class="edit-icon" title="Rename pods">✏️ Edit pods</span>`;
+      editChip.onclick = () => {
+        const oldName = prompt("Pod to rename (D&S, SLA, LOSS, CX, HYC):", "D&S");
+        if (!oldName) return;
+        if (oldName.toUpperCase() === "ALL" || oldName === "Others") { alert(`${oldName} cannot be renamed.`); return; }
+        const idx = pods.findIndex(x => x.toLowerCase() === oldName.toLowerCase());
+        if (idx === -1) { alert("Pod not found."); return; }
+        const newName = prompt(`New name for ${oldName}:`, oldName);
+        if (!newName || !newName.trim()) return;
+        pods[idx] = newName.trim();
+        if (activePod.toLowerCase() === oldName.toLowerCase()) activePod = pods[idx];
+        renderPodsLine(); rebindRealtime(); populatePodDropdowns();
+      };
+      podsRow.appendChild(editChip);
+    }
 
-            try {
-                // Use setDoc to update the single settings document
-                await setDoc(settingsRef(), {
-                    pods: newPods,
-                    weekTypes: newWeekTypes,
-                    customWeeks: newCustomWeeks,
-                    theme: currentTheme, // Keep current theme
-                    updatedBy: userId,
-                    updatedTimestamp: new Date().toISOString()
-                }, { merge: true });
+    /* ---------------------------------------------------------
+       Weeks line
+       --------------------------------------------------------- */
+    function renderWeeksLine() {
+      weeksRow.innerHTML = "";
+      const nowInfo = weekInfo(new Date());
+      activeWeekKey = activeWeekKey || nowInfo.key;
+      activeWeekLabel = activeWeekLabel || nowInfo.label;
+      previousWeekKey = nowInfo.prevKey;
 
-                console.log("Settings saved successfully.");
-                window.closeSettingsModal();
-            } catch (error) {
-                console.error("Error saving settings:", error);
-            }
+      const entries = [];
+      const baseMonday = new Date();
+      baseMonday.setDate(baseMonday.getDate() - ((baseMonday.getDay() + 6) % 7));
+      for (let i = 0; i < 5; i++) {
+        const d = new Date(baseMonday.getTime());
+        d.setDate(d.getDate() - (7 * i));
+        const info = weekInfo(d);
+        if (info.key === activeWeekKey) info.label = activeWeekLabel;
+        entries.push(info);
+      }
+
+      entries.forEach(info => {
+        const chip = document.createElement("div");
+        chip.className = "chip" + (info.key === activeWeekKey ? " active" : "");
+        chip.title = info.key;
+        const input = document.createElement("input");
+        input.value = info.label;
+        input.readOnly = true;
+        chip.appendChild(input);
+        chip.onclick = () => {
+          activeWeekKey = info.key;
+          activeWeekLabel = info.label;
+          previousWeekKey = info.prevKey;
+          renderWeeksLine();
+          rebindRealtime();
         };
+        weeksRow.appendChild(chip);
+      });
 
-        // --- DATA MANAGEMENT (Releases) ---
-        
-        const listenForReleases = () => {
-            if (!isAuthReady || !db) return;
+      const editChip = document.createElement("div");
+      editChip.className = "chip";
+      editChip.innerHTML = `<span class="edit-icon" title="Edit active week label">✏️ Edit week</span>`;
+      editChip.onclick = () => {
+        const newLabel = prompt("Week label (Week X - QY - YYYY):", activeWeekLabel);
+        if (!newLabel || !newLabel.trim()) return;
+        activeWeekLabel = newLabel.trim();
+        renderWeeksLine();
+      };
+      weeksRow.appendChild(editChip);
+    }
 
-            // Real-time listener for the releases collection
-            onSnapshot(releasesCollection(), (snapshot) => {
-                // Map documents to include the document ID
-                dashboardData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                console.log(`Loaded ${dashboardData.length} release items.`);
-                // Re-render dashboard on any data change
-                renderDashboard();
-            }, (error) => {
-                console.error("Error listening to releases:", error);
-            });
-        };
+    /* ---------------------------------------------------------
+       Auth
+       --------------------------------------------------------- */
+    async function initAuth() {
+      try {
+        await signInAnonymously(auth);
+        db = getFirestore(app);
+        authStateEl.textContent = "Auth: Anonymous";
+        clearError();
+        await loadPodsFromDb();
+        renderPodsLine();
+        populatePodDropdowns();
+      } catch (e) {
+        try { db = getFirestore(app); } catch (_) {}
+        authStateEl.textContent = "Auth: Failed";
+        showError("Enable Anonymous sign-in and add your domain in Firebase.");
+      }
+    }
 
-        // Function to save/update a release item (CRUD Create/Update)
-        window.saveReleaseItem = async (event) => {
-            event.preventDefault();
-            if (!isAuthReady || !db) return;
+    /* ---------------------------------------------------------
+       Collections
+       --------------------------------------------------------- */
+    const lastCol  = () => collection(db, "dashboard_last");
+    const upCol    = () => collection(db, "dashboard_upcoming");
+    const blockCol = () => collection(db, "dashboard_blockers");
 
-            const form = event.target;
-            const data = {
-                key: form['key'].value.trim(),
-                owner: form['owner'].value.trim(),
-                summary: form['summary'].value.trim(),
-                pod: form['pod'].value,
-                priority: form['priority'].value,
-                status: form['status'].value,
-                week_type: form['week_type'].value,
-                week_id: form['week_id'].value.trim(),
-                updatedBy: userId,
-                updatedTimestamp: new Date().toISOString()
-            };
-            
-            const itemId = form['id'].value;
+    /* ---------------------------------------------------------
+       Add handlers (pod dropdown + active week) with optimistic render
+       --------------------------------------------------------- */
+    async function addLastItem() {
+      const title = el("lastTitle").value.trim();
+      const date = el("lastDate").value;
+      const notes = el("lastNotes").value.trim();
+      const podSel = el("lastPod").value;
+      if (!title || !date) { alert("Provide Title and Release Date"); return; }
+      if (!db) { showError("Auth failed. Enable Anonymous sign-in and add your domain."); return; }
 
-            try {
-                if (itemId) {
-                    // Update existing item using updateDoc
-                    await updateDoc(releaseDocRef(itemId), data);
-                    console.log("Item updated:", itemId);
-                } else {
-                    // Add new item using addDoc
-                    await addDoc(releasesCollection(), { 
-                        ...data,
-                        createdBy: userId,
-                        createdTimestamp: new Date().toISOString()
-                    });
-                    console.log("New item added.");
-                }
-                window.closeModal();
-            } catch (error) {
-                console.error("Error saving release item:", error);
-            }
-        };
+      const payload = { pod: podSel, weekKey: activeWeekKey, weekKeyLabel: activeWeekLabel, title, date, notes: notes || null, createdAt: new Date() };
+      const tempId = "temp_last_" + Math.random().toString(36).slice(2);
+      const tempNode = optimisticPrepend(lastList, lineItem, tempId, payload, "dashboard_last");
 
-        // Function to delete a release item (CRUD Delete)
-        window.deleteReleaseItem = async (itemId) => {
-             if (!isAuthReady || !db) return;
-
-             // Use the custom confirmation modal (replaces alert/confirm)
-             const confirmDelete = await showCustomConfirmation(
-                "Confirm Delete",
-                "Are you sure you want to permanently delete this release item? This action cannot be undone."
-             );
-             
-             if (!confirmDelete) return;
-
-             try {
-                await deleteDoc(releaseDocRef(itemId));
-                console.log("Item deleted:", itemId);
-             } catch (error) {
-                console.error("Error deleting release item:", error);
-             }
-        };
-
-
-        // --- UI RENDERING ---
-
-        const renderFormSelects = () => {
-            // Populate form selects (used in item modal)
-            populateSelect('pod-select-form', PODS);
-            populateSelect('priority-select-form', PRIORITY_OPTIONS);
-            populateSelect('category-select-form', WEEK_TYPE_OPTIONS);
-            populateSelect('status-select-form', STATUS_OPTIONS);
-        };
-
-        window.setPodFilter = (pod) => {
-            currentFilter = pod;
-            renderPodFilters(); // Re-render to highlight active filter
-            renderDashboard(); // Re-render dashboard content
-        };
-
-        const renderPodFilters = () => {
-            const allPods = ['All', ...PODS];
-            podFilterList.innerHTML = allPods.map(pod => {
-                const isActive = pod === currentFilter;
-                return `
-                    <button 
-                        class="px-3 py-1 text-xs font-semibold rounded-full transition duration-150 whitespace-nowrap
-                        ${isActive 
-                            ? 'text-white main-button shadow-md' 
-                            : 'text-gray-600 bg-gray-200 hover:bg-gray-300'
-                        }"
-                        onclick="window.setPodFilter('${pod}')"
-                    >
-                        ${pod}
-                    </button>
-                `;
-            }).join('');
-        };
-        
-        window.setCurrentWeek = (weekId) => {
-            currentWeekId = weekId;
-            currentWeekDisplay.textContent = weekToLabel(weekId);
-            renderWeekSelector(); // Re-render to highlight active week
-            renderDashboard(); // Re-render dashboard content
-        };
-
-        const renderWeekSelector = () => {
-            weekSelectorContainer.innerHTML = CUSTOM_WEEKS.map(weekId => {
-                const isActive = weekId === currentWeekId;
-                const weekLabel = weekToLabel(weekId);
-                const isCurrent = weekId === getCurrentWeekId();
-                
-                return `
-                    <button
-                        class="px-4 py-2 text-sm font-medium rounded-lg shadow-sm transition duration-150 flex-shrink-0 whitespace-nowrap
-                        ${isActive 
-                            ? 'text-white main-button shadow-xl ring-2 ring-primary ring-opacity-50' 
-                            : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
-                        }"
-                        onclick="window.setCurrentWeek('${weekId}')"
-                    >
-                        ${weekLabel} ${isCurrent ? '<span class="text-xs ml-1">(Current)</span>' : ''}
-                    </button>
-                `;
-            }).join('');
-
-             // If no week is selected, set the current one as default after rendering
-            if (!currentWeekId && CUSTOM_WEEKS.length > 0) {
-                 window.setCurrentWeek(getCurrentWeekId());
-             }
-        };
-
-        const renderReleaseItem = (item) => {
-            const priorityBadge = createPriorityBadge(item.priority);
-            
-            return `
-                <div class="p-4 bg-white rounded-lg shadow-md border-l-4 border-primary hover:shadow-lg transition duration-200 mb-3 flex justify-between items-start">
-                    <div class="flex-1 min-w-0">
-                        <div class="flex items-center space-x-3 mb-1">
-                            <h4 class="text-base font-semibold text-gray-800 truncate">${item.key} - ${item.summary}</h4>
-                            ${priorityBadge}
-                            <span class="px-2 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-600">${item.pod}</span>
-                        </div>
-                        <p class="text-sm text-gray-600 mb-2 truncate">Owner: ${item.owner} | Status: ${item.status}</p>
-                        <div class="text-xs text-gray-500 flex items-center space-x-2">
-                             <span>Week: ${item.week_id ? weekToLabel(item.week_id) : 'N/A'}</span>
-                             <span>| Category: ${item.week_type}</span>
-                        </div>
-                    </div>
-                    <!-- Actions -->
-                    <div class="no-clutter flex items-center space-x-2 ml-4 flex-shrink-0">
-                        <button class="edit-icon text-gray-500 hover:text-primary transition" title="Edit Item" onclick="window.openModal(false, null, '${item.id}')">
-                            <i data-lucide="square-pen" class="w-5 h-5"></i>
-                        </button>
-                        <button class="edit-icon text-gray-500 hover:text-red-500 transition" title="Delete Item" onclick="window.deleteReleaseItem('${item.id}')">
-                            <i data-lucide="trash-2" class="w-5 h-5"></i>
-                        </button>
-                    </div>
-                </div>
-            `;
-        };
-
-        const renderReleaseCard = (title, items) => {
-            return `
-                <div class="release-card bg-white p-6 rounded-xl shadow-2xl border-t-4 border-primary">
-                    <h2 class="text-xl font-extrabold text-primary mb-4 border-b pb-2">${title} (${items.length})</h2>
-                    <div class="space-y-4 min-h-[100px]" id="release-list-${title.replace(/\s/g, '-')}">
-                        ${items.length === 0 
-                            ? `<p class="text-gray-500 italic p-4 bg-gray-50 rounded-lg">No ${title.toLowerCase()} items found for the current filters.</p>` 
-                            : items.map(renderReleaseItem).join('')
-                        }
-                    </div>
-                </div>
-            `;
-        };
-
-        const renderDashboard = () => {
-            if (!isAuthReady || !currentWeekId) return;
-
-            // 1. Filter by Pod (if not 'All')
-            const filteredData = currentFilter === 'All'
-                ? dashboardData
-                : dashboardData.filter(item => item.pod === currentFilter);
-
-            // 2. Determine previous and next week IDs dynamically
-            const prevWeekId = getPreviousWeekId(currentWeekId);
-            const nextWeekId = currentWeekId; // Current focus week is treated as the 'Next' or 'Current' release
-
-            // 3. Separate into sections based on week_type and week_id
-            const previousReleases = filteredData.filter(item => 
-                (item.week_type === PREV_WEEK_KEY || item.week_id === prevWeekId) && item.week_type !== BLOCKER_KEY
-            );
-            const nextReleases = filteredData.filter(item => 
-                (item.week_type === NEXT_WEEK_KEY || item.week_id === nextWeekId) && item.week_type !== BLOCKER_KEY
-            );
-            const blockers = filteredData.filter(item => 
-                item.week_type === BLOCKER_KEY
-            );
-            
-            // Sort by priority for better visibility (Critical first)
-            const sortOrder = PRIORITY_OPTIONS;
-            const sortByPriority = (a, b) => sortOrder.indexOf(a.priority) - sortOrder.indexOf(b.priority);
-
-            previousReleasesDiv.innerHTML = renderReleaseCard(`Previous Release Items (${prevWeekId ? weekToLabel(prevWeekId) : 'N/A'})`, previousReleases.sort(sortByPriority));
-            nextReleasesDiv.innerHTML = renderReleaseCard(`Current Release Items (${weekToLabel(nextWeekId)})`, nextReleases.sort(sortByPriority));
-            blockersSectionDiv.innerHTML = renderReleaseCard(`Critical Blockers`, blockers.sort(sortByPriority));
-
-            lucide.createIcons();
-        };
-
-
-        // --- MODAL LOGIC (CRUD Form) ---
-
-        const resetForm = () => {
-            itemForm.reset();
-            document.getElementById('item-id-input').value = '';
-            document.getElementById('modal-title').textContent = 'Add New Release Item';
-            document.getElementById('form-submit-btn').textContent = 'Save Item';
-        };
-
-        window.openModal = (isNew, defaultCategory = null, itemId = null) => {
-            resetForm();
-            
-            // Set default week ID (current focus week)
-            document.getElementById('week-input').value = currentWeekId || getCurrentWeekId();
-            
-            // Set default category for new items
-            const categorySelect = document.getElementById('category-select-form').selectElement;
-            if (isNew && defaultCategory && categorySelect) {
-                 categorySelect.value = defaultCategory;
-            }
-
-            if (itemId) {
-                const item = dashboardData.find(d => d.id === itemId);
-                if (item) {
-                    document.getElementById('modal-title').textContent = 'Edit Release Item';
-                    document.getElementById('form-submit-btn').textContent = 'Update Item';
-                    document.getElementById('item-id-input').value = item.id;
-                    document.getElementById('key-input').value = item.key;
-                    document.getElementById('owner-input').value = item.owner;
-                    document.getElementById('summary-input').value = item.summary;
-                    document.getElementById('week-input').value = item.week_id;
-                    
-                    document.getElementById('pod-select-form').selectElement.value = item.pod;
-                    document.getElementById('priority-select-form').selectElement.value = item.priority;
-                    document.getElementById('category-select-form').selectElement.value = item.week_type;
-                    document.getElementById('status-select-form').selectElement.value = item.status;
-                }
-            }
-
-            itemModal.classList.remove('hidden');
-            setTimeout(() => {
-                modalContent.classList.remove('scale-95', 'opacity-0');
-                modalContent.classList.add('scale-100', 'opacity-100');
-            }, 10);
-        };
-
-        window.closeModal = () => {
-            modalContent.classList.remove('scale-100', 'opacity-100');
-            modalContent.classList.add('scale-95', 'opacity-0');
-            setTimeout(() => {
-                itemModal.classList.add('hidden');
-                resetForm();
-            }, 300);
-        };
-        
-        // Custom confirmation modal (to replace confirm() browser calls)
-        const showCustomConfirmation = (title, message) => {
-            return new Promise(resolve => {
-                const modalId = 'confirmation-modal';
-                let modal = document.getElementById(modalId);
-                
-                // If modal doesn't exist, create it once
-                if (!modal) {
-                    modal = document.createElement('div');
-                    modal.id = modalId;
-                    // z-index 60 is higher than other modals (z-50)
-                    modal.className = 'fixed inset-0 bg-gray-600 bg-opacity-75 overflow-y-auto h-full w-full z-[60] flex items-center justify-center hidden';
-                    modal.innerHTML = `
-                        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm mx-4 p-6">
-                            <h3 class="text-xl font-semibold text-gray-900 mb-3 border-b pb-2" id="confirm-title"></h3>
-                            <p class="text-gray-700 mb-6" id="confirm-message"></p>
-                            <div class="flex justify-end space-x-3">
-                                <button id="confirm-cancel" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition duration-150">Cancel</button>
-                                <button id="confirm-ok" class="px-4 py-2 text-sm font-medium text-white main-button rounded-lg transition duration-150">Confirm</button>
-                            </div>
-                        </div>
-                    `;
-                    document.body.appendChild(modal);
-                }
-
-                document.getElementById('confirm-title').textContent = title;
-                document.getElementById('confirm-message').textContent = message;
-                modal.classList.remove('hidden');
-
-                const okBtn = document.getElementById('confirm-ok');
-                const cancelBtn = document.getElementById('confirm-cancel');
-
-                // Listener cleanup and modal hide
-                const cleanUp = () => {
-                    okBtn.removeEventListener('click', onOk);
-                    cancelBtn.removeEventListener('click', onCancel);
-                    modal.classList.add('hidden');
-                };
-
-                const onOk = () => {
-                    cleanUp();
-                    resolve(true);
-                };
-
-                const onCancel = () => {
-                    cleanUp();
-                    resolve(false);
-                };
-
-                okBtn.addEventListener('click', onOk);
-                cancelBtn.addEventListener('click', onCancel);
-            });
-        };
-
-
-        // --- ADMIN SETTINGS MODAL LOGIC ---
-
-        window.openSettingsModal = () => {
-            if (!isAuthReady) return;
-
-            // Load current settings into form textareas
-            podsInput.value = PODS.join('\n');
-            
-            // Filter out the fixed keys before displaying user-editable ones
-            const editableWeekTypes = WEEK_TYPE_OPTIONS.filter(wt => 
-                wt !== NEXT_WEEK_KEY && wt !== PREV_WEEK_KEY && wt !== BLOCKER_KEY
-            );
-            weekTypesInput.value = editableWeekTypes.join('\n');
-            customWeeksInput.value = CUSTOM_WEEKS.join('\n');
-
-            settingsModal.classList.remove('hidden');
-            setTimeout(() => {
-                settingsModalContent.classList.remove('scale-95', 'opacity-0');
-                settingsModalContent.classList.add('scale-100', 'opacity-100');
-            }, 10);
-        };
-
-        window.closeSettingsModal = () => {
-            settingsModalContent.classList.remove('scale-100', 'opacity-100');
-            settingsModalContent.classList.add('scale-95', 'opacity-0');
-            setTimeout(() => {
-                settingsModal.classList.add('hidden');
-            }, 300);
-        };
-
-        // --- EVENT ATTACHMENTS & INITIALIZATION ---
-
-        // Modal event listeners
-        closeModalBtn.addEventListener('click', window.closeModal);
-        formCancelBtn.addEventListener('click', window.closeModal);
-        itemForm.addEventListener('submit', window.saveReleaseItem);
-
-        // Settings event listeners
-        closeSettingsModalBtn.addEventListener('click', window.closeSettingsModal);
-        settingsForm.addEventListener('submit', window.saveSettings);
-
-        // PDF Download Listener
-        pdfDownloadBtn.addEventListener('click', () => {
-            // Use presentation mode to hide controls before printing
-            const originalMode = body.classList.contains('presentation-mode');
-            if (!originalMode) {
-                 window.togglePresentationMode();
-            }
-
-            // A small delay to ensure the DOM repaint before printing
-            setTimeout(() => {
-                window.print();
-                // Restore presentation mode after printing
-                if (!originalMode) {
-                     window.togglePresentationMode();
-                }
-            }, 50); 
+      try {
+        await addDoc(lastCol(), {
+          pod: podSel,
+          weekKey: activeWeekKey,
+          weekKeyLabel: activeWeekLabel,
+          title, date, notes: notes || null,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
         });
+        tempNode.remove(); // snapshot will add the real item
+      } catch (e) {
+        showError("Failed to add previous release. " + e.message);
+      }
 
-        // Start the application
-        initFirebaseAndAuth();
+      el("lastTitle").value = ""; el("lastDate").value = ""; el("lastNotes").value = "";
+      lastForm.style.display = "none";
+    }
 
-    </script>
+    async function addUpcomingItem() {
+      const title = el("upTitle").value.trim();
+      const date = el("upDate").value;
+      const notes = el("upNotes").value.trim();
+      const podSel = el("upPod").value;
+      if (!title || !date) { alert("Provide Title and Release Date"); return; }
+      if (!db) { showError("Auth failed. Enable Anonymous sign-in and add your domain."); return; }
+
+      const payload = { pod: podSel, weekKey: activeWeekKey, weekKeyLabel: activeWeekLabel, title, date, notes: notes || null, createdAt: new Date() };
+      const tempId = "temp_up_" + Math.random().toString(36).slice(2);
+      const tempNode = optimisticPrepend(upList, lineItem, tempId, payload, "dashboard_upcoming");
+
+      try {
+        await addDoc(upCol(), {
+          pod: podSel,
+          weekKey: activeWeekKey,
+          weekKeyLabel: activeWeekLabel,
+          title, date, notes: notes || null,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+        tempNode.remove();
+      } catch (e) {
+        showError("Failed to add upcoming release. " + e.message);
+      }
+
+      el("upTitle").value = ""; el("upDate").value = ""; el("upNotes").value = "";
+      upForm.style.display = "none";
+    }
+
+    async function addBlockerItem() {
+      const title = el("blockTitle").value.trim();
+      const owner = el("blockOwner").value.trim();
+      const notes = el("blockNotes").value.trim();
+      const podSel = el("blockPod").value;
+      if (!title) { alert("Provide Blocker Summary"); return; }
+      if (!db) { showError("Auth failed. Enable Anonymous sign-in and add your domain."); return; }
+
+      const payload = {
+        pod: podSel, weekKey: activeWeekKey, weekKeyLabel: activeWeekLabel,
+        title, owner: owner || null, notes: notes || null, severity: "Medium", createdAt: new Date()
+      };
+      const tempId = "temp_block_" + Math.random().toString(36).slice(2);
+      const tempNode = optimisticPrepend(blockList, blockerLineItem, tempId, payload, "dashboard_blockers");
+
+      try {
+        await addDoc(blockCol(), {
+          pod: podSel,
+          weekKey: activeWeekKey,
+          weekKeyLabel: activeWeekLabel,
+          title, owner: owner || null, notes: notes || null, severity: "Medium",
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+        tempNode.remove();
+      } catch (e) {
+        showError("Failed to add blocker. " + e.message);
+      }
+
+      el("blockTitle").value = ""; el("blockOwner").value = ""; el("blockNotes").value = "";
+      blockForm.style.display = "none";
+    }
+
+    /* ---------------------------------------------------------
+       Realtime bindings (ALL aggregates by week; pod filters by pod+week)
+       - "Others" is treated as its own pod for filtering
+       --------------------------------------------------------- */
+    function rebindRealtime() {
+      if (!db) return;
+
+      try { unsubLast && unsubLast(); } catch(_) {}
+      try { unsubUpcoming && unsubUpcoming(); } catch(_) {}
+      try { unsubBlockers && unsubBlockers(); } catch(_) {}
+
+      const isAll = activePod === "ALL";
+
+      // Previous releases
+      try {
+        const qLast = isAll
+          ? query(lastCol(), where("weekKey", "==", activeWeekKey))
+          : query(lastCol(), where("pod", "==", activePod), where("weekKey", "==", activeWeekKey));
+        unsubLast = onSnapshot(qLast, (snap) => {
+          lastList.innerHTML = "";
+          if (snap.empty) { lastList.innerHTML = `<div class="empty">No previous releases</div>`; return; }
+          const items = [];
+          snap.forEach(d => items.push({ id: d.id, data: d.data() }));
+          // latest first
+          items.sort((a,b)=> (b.data.createdAt?.seconds || 0) - (a.data.createdAt?.seconds || 0));
+          let idx = 1;
+          items.forEach(({id,data}) => lastList.appendChild(lineItem(idx++, id, data, "dashboard_last")));
+        }, (err)=> showError("Previous releases listener error: " + err.message));
+      } catch(e){ showError("Previous releases query error: " + e.message); }
+
+      // Upcoming releases
+      try {
+        const qUp = isAll
+          ? query(upCol(), where("weekKey", "==", activeWeekKey))
+          : query(upCol(), where("pod", "==", activePod), where("weekKey", "==", activeWeekKey));
+        unsubUpcoming = onSnapshot(qUp, (snap) => {
+          upList.innerHTML = "";
+          if (snap.empty) { upList.innerHTML = `<div class="empty">No upcoming releases</div>`; return; }
+          const items = [];
+          snap.forEach(d => items.push({ id: d.id, data: d.data() }));
+          items.sort((a,b)=> (b.data.createdAt?.seconds || 0) - (a.data.createdAt?.seconds || 0));
+          let idx = 1;
+          items.forEach(({id,data}) => upList.appendChild(lineItem(idx++, id, data, "dashboard_upcoming")));
+        }, (err)=> showError("Upcoming listener error: " + err.message));
+      } catch(e){ showError("Upcoming query error: " + e.message); }
+
+      // Blockers
+      try {
+        const qBlock = isAll
+          ? query(blockCol(), where("weekKey", "==", activeWeekKey))
+          : query(blockCol(), where("pod", "==", activePod), where("weekKey", "==", activeWeekKey));
+        unsubBlockers = onSnapshot(qBlock, (snap) => {
+          blockList.innerHTML = "";
+          if (snap.empty) { blockList.innerHTML = `<div class="empty">No blockers</div>`; return; }
+          const items = [];
+          snap.forEach(d => items.push({ id: d.id, data: d.data() }));
+          items.sort((a,b)=> (b.data.createdAt?.seconds || 0) - (a.data.createdAt?.seconds || 0));
+          let idx = 1;
+          items.forEach(({id,data}) => blockList.appendChild(blockerLineItem(idx++, id, data, "dashboard_blockers")));
+        }, (err)=> showError("Blockers listener error: " + err.message));
+      } catch(e){ showError("Blockers query error: " + e.message); }
+    }
+
+    /* ---------------------------------------------------------
+       Central Save (pods + visible edits)
+       --------------------------------------------------------- */
+    async function saveAll() {
+      if (!db) { showError("Auth failed. Enable Anonymous sign-in and add your domain."); return; }
+      const tasks = [];
+      tasks.push(savePodsToDb());
+
+      document.querySelectorAll(".line").forEach(node => {
+        const id = node.dataset.id, col = node.dataset.col;
+        if (!id || !col) return;
+        const payload = { updatedAt: serverTimestamp() };
+        const titleEl = node.querySelector(".line-title"); if (titleEl) payload.title = titleEl.textContent.trim();
+        const dateEl = node.querySelector('input[type="date"]'); payload.date = dateEl ? (dateEl.value || null) : null;
+        const notesEl = node.querySelector('textarea'); payload.notes = notesEl ? (notesEl.value.trim() || null) : null;
+        const sevEl = node.querySelector('input:not([type="date"])');
+        if (sevEl && col === "dashboard_blockers") payload.severity = sevEl.value.trim() || null;
+        tasks.push(updateDoc(doc(db, col, id), payload));
+      });
+
+      try { await Promise.all(tasks); clearError(); alert("All edits saved."); }
+      catch(e){ showError("Failed to save some items. " + e.message); }
+    }
+
+    /* ---------------------------------------------------------
+       Theme gear + palette (persisted)
+       --------------------------------------------------------- */
+    function bindThemes() {
+      let open = false;
+      themeGear.onclick = () => { open = !open; themeMenu.style.display = open ? "flex" : "none"; };
+      document.querySelectorAll(".theme-dot").forEach(dot => {
+        dot.onclick = () => {
+          const theme = dot.dataset.theme || "theme-sky";
+          document.body.className = theme;
+          localStorage.setItem("pod_theme", theme);
+          themeMenu.style.display = "none";
+          open = false;
+        };
+      });
+      const saved = localStorage.getItem("pod_theme"); if (saved) document.body.className = saved;
+      document.addEventListener("click", (e) => {
+        const inside = e.target.closest("#themeMenu") || e.target.closest("#themeGear");
+        if (!inside) { themeMenu.style.display = "none"; open = false; }
+      });
+    }
+
+    /* ---------------------------------------------------------
+       Presentation mode (ESC to exit)
+       --------------------------------------------------------- */
+    function bindPresentationMode() {
+      el("presentationBtn").onclick = () => { document.body.classList.add("presentation"); };
+      document.addEventListener("keydown", (e) => { if (e.key === "Escape") document.body.classList.remove("presentation"); });
+    }
+
+    /* ---------------------------------------------------------
+       UI bindings
+       --------------------------------------------------------- */
+    function bindUI() {
+      el("toggleLastForm").onclick = () => { lastForm.style.display = lastForm.style.display === "none" ? "grid" : "none"; };
+      el("toggleUpcomingForm").onclick = () => { upForm.style.display = upForm.style.display === "none" ? "grid" : "none"; };
+      el("toggleBlockerForm").onclick = () => { blockForm.style.display = blockForm.style.display === "none" ? "grid" : "none"; };
+
+      el("addLast").onclick = addLastItem;
+      el("addUpcoming").onclick = addUpcomingItem;
+      el("addBlocker").onclick = addBlockerItem;
+
+      el("saveAll").onclick = saveAll;
+    }
+
+    /* ---------------------------------------------------------
+       Boot
+       --------------------------------------------------------- */
+    (async function boot() {
+      const info = weekInfo(new Date());
+      activeWeekKey = info.key; activeWeekLabel = info.label; previousWeekKey = info.prevKey;
+
+      bindUI(); bindThemes(); bindPresentationMode();
+      await initAuth();
+
+      renderPodsLine();
+      renderWeeksLine();
+      populatePodDropdowns();
+
+      rebindRealtime();
+    })();
+  </script>
 </body>
 </html>
